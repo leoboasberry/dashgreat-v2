@@ -15,5 +15,5 @@ const proxyConfig = {
 export default defineConfig({
   plugins: [react()],
   server: { proxy: proxyConfig },
-  preview: { proxy: proxyConfig },
+  preview: { proxy: proxyConfig, allowedHosts: 'all' },
 })
