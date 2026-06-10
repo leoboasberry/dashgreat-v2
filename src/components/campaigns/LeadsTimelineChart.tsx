@@ -87,7 +87,7 @@ export default function LeadsTimelineChart({ leads, stackBySource, onToggleStack
             cursor={{ stroke: '#e2e8f0', strokeWidth: 1 }}
           />
           {stackBySource && sources.length > 1 ? (
-            visibleSources.map((src, i) => (
+            visibleSources.map((src) => (
               <Area
                 key={src}
                 type="monotone"

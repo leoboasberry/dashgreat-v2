@@ -229,9 +229,9 @@ export function buildDailySeriesByKey(
   leads: ParsedLead[],
   key: keyof ParsedLead,
   fallback = '(não informado)',
-): { date: string; keys: string[]; [k: string]: number | string | string[] } {
+): { date: string; keys: string[]; [k: string]: number | string | string[] }[] {
   const datedLeads = leads.filter((l) => l.date)
-  if (datedLeads.length === 0) return { date: '', keys: [] }
+  if (datedLeads.length === 0) return []
 
   const allKeys = [...new Set(datedLeads.map((l) => (l[key] as string) || fallback))].sort()
 
