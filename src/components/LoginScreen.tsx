@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Lock } from 'lucide-react'
 import { hashPassword } from '../utils/hash'
+import berryLogo from '/berry-logo.png'
 
 interface Props {
   // Env-var mode: compare plain text
@@ -40,14 +41,18 @@ export default function LoginScreen({ envPassword, storedHash, onLogin, onReset 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-xl w-full max-w-sm p-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="bg-blue-600 text-white rounded-xl p-2">
-            <Lock size={22} />
+        <div className="flex flex-col items-center mb-8">
+          <img src={berryLogo} alt="Berry" className="h-14 w-auto object-contain mb-3" />
+          <h1 className="text-base font-semibold text-gray-700 text-center leading-snug">
+            Controle Geral Performance Berry - Consultoria
+          </h1>
+        </div>
+
+        <div className="flex items-center gap-2 mb-5">
+          <div className="bg-blue-600 text-white rounded-lg p-1.5">
+            <Lock size={16} />
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-800">GreatPages Dashboard</h1>
-            <p className="text-sm text-gray-400">Digite sua senha para acessar</p>
-          </div>
+          <p className="text-sm text-gray-400">Digite sua senha para acessar</p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
