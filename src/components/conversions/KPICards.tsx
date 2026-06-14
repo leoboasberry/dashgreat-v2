@@ -14,25 +14,6 @@ function pct(a: number, b: number): string {
   return ((a / b) * 100).toFixed(1) + '%'
 }
 
-function Card({
-  label,
-  value,
-  sub,
-  color = 'text-blue-600',
-}: {
-  label: string
-  value: string
-  sub?: string
-  color?: string
-}) {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-1">
-      <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">{label}</span>
-      <span className={`text-2xl font-bold ${color}`}>{value}</span>
-      {sub && <span className="text-xs text-gray-400">{sub}</span>}
-    </div>
-  )
-}
 
 function pacingColor(_ritmo: number): string {
   return 'text-[#1a1a1a]'
