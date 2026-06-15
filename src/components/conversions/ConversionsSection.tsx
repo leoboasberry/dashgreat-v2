@@ -5,6 +5,8 @@ import { CHANNELS, normalizeCrmChannel } from '../../utils/channelNorm'
 import { parseAllLeads, filterLeads } from '../../utils/parseLeads'
 import { computeMetrics, extractFilterOptions } from '../../utils/computeMetrics'
 import type { PageData } from '../../hooks/useDashboard'
+import { useCeaConfig } from '../../hooks/useCeaConfig'
+import { useExcludedCampaigns } from '../../hooks/useExcludedCampaigns'
 import KPICards from './KPICards'
 import FunnelChart from './FunnelChart'
 import DailyLeadsChart from './DailyLeadsChart'
@@ -15,6 +17,7 @@ import InvestmentChart from './InvestmentChart'
 import PacingSection from './PacingSection'
 import QualityMetricsSection from './QualityMetricsSection'
 import MultiSelect from './MultiSelect'
+import ExcludedCampaignsFilter from './ExcludedCampaignsFilter'
 
 function currentMonthRange() {
   const now = new Date()
@@ -48,15 +51,60 @@ export default function ConversionsSection({ pages }: Props) {
   const [onlyActive, setOnlyActive] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(true)
 
+  // CEA config + excluded campaigns (Supabase-persisted)
+  const { config: ceaConfig, saveConfig: saveCeaConfig, syncing: ceaSyncing } = useCeaConfig()
+  const { excluded: excludedCampaigns, updateExcluded: setExcludedCampaigns } = useExcludedCampaigns()
+
   // Fetch raw data
   const { loading, error, rawWindsorRows, rawEvents, reload } = useConversionsData(dateFrom, dateTo)
+
+  // Apply campaign exclusions before any computation
+  const filteredWindsorRows = useMemo(
+    () =>
+      excludedCampaigns.length > 0
+        ? rawWindsorRows.filter((r) => !excludedCampaigns.includes(r.campaign ?? ''))
+        : rawWindsorRows,
+    [rawWindsorRows, excludedCampaigns],
+  )
+
+  // All unique Windsor campaign full names for the exclusion filter dropdown
+  const allWindsorCampaigns = useMemo(() => {
+    const names = new Set<string>()
+    for (const r of rawWindsorRows) {
+      if (r.campaign?.trim()) names.add(r.campaign.trim())
+    }
+    return [...names].sort()
+  }, [rawWindsorRows])
+
+  // Excluded campaign codes (for filtering Supabase events)
+  const excludedCodes = useMemo(() => {
+    const codes = new Set<string>()
+    for (const name of excludedCampaigns) {
+      const m = name.match(/\b([A-Za-z]+\d+)\b/)
+      if (m) codes.add(m[1]!)
+    }
+    return [...codes]
+  }, [excludedCampaigns])
+
+  const filteredEvents = useMemo(
+    () =>
+      excludedCodes.length > 0
+        ? rawEvents.filter((ev) => {
+            const utmCampaign = ev.payload?.deal?.utmCampaign ?? ''
+            const m = utmCampaign.match(/\b([A-Za-z]+\d+)\b/)
+            const code = m ? m[1]! : ''
+            return !code || !excludedCodes.includes(code)
+          })
+        : rawEvents,
+    [rawEvents, excludedCodes],
+  )
 
   // Auto-initialize revenue filter: select all except low-revenue tiers
   const lastInitedEventsRef = useRef<typeof rawEvents | null>(null)
   useEffect(() => {
     if (rawEvents.length === 0 || rawEvents === lastInitedEventsRef.current) return
     lastInitedEventsRef.current = rawEvents
-    const { revenue: allRevenue } = extractFilterOptions(rawEvents)
+    const { revenue: allRevenue } = extractFilterOptions(filteredEvents)
     const EXCLUDED = ['até 40 mil', 'até 30 mil']
     const defaults = allRevenue.filter(
       (r) => !EXCLUDED.some((ex) => r.toLowerCase().includes(ex)),
@@ -75,8 +123,8 @@ export default function ConversionsSection({ pages }: Props) {
 
   // Filter options (cascade: adsets depend on selected campaigns, ads on selected adsets)
   const filterOptions = useMemo(
-    () => extractFilterOptions(rawEvents, selCampaigns, selAdSets),
-    [rawEvents, selCampaigns, selAdSets],
+    () => extractFilterOptions(filteredEvents, selCampaigns, selAdSets),
+    [filteredEvents, selCampaigns, selAdSets],
   )
 
   // Page options with names resolved
@@ -101,7 +149,7 @@ export default function ConversionsSection({ pages }: Props) {
   // Compute all metrics from raw data + current filters
   const metrics = useMemo(
     () =>
-      computeMetrics(rawWindsorRows, rawEvents, {
+      computeMetrics(filteredWindsorRows, filteredEvents, {
         channels: activeChannels,
         campaigns: selCampaigns,
         adSets: selAdSets,
@@ -111,7 +159,7 @@ export default function ConversionsSection({ pages }: Props) {
         segments: selSegments,
         onlyActive,
       }),
-    [rawWindsorRows, rawEvents, activeChannels, selCampaigns, selAdSets, selAds, selPages, selRevenue, selSegments, onlyActive],
+    [filteredWindsorRows, filteredEvents, activeChannels, selCampaigns, selAdSets, selAds, selPages, selRevenue, selSegments, onlyActive],
   )
 
   const { totalSpend, funnelCounts, totalMRR, byChannel, byAd, dailySpend, dailyFunnel, investmentPartial, campaignStatuses } = metrics
@@ -380,6 +428,15 @@ export default function ConversionsSection({ pages }: Props) {
 
               <div className="w-px h-4 bg-gray-200 mx-1 hidden sm:block" />
 
+              {/* Excluded campaigns */}
+              <ExcludedCampaignsFilter
+                allCampaigns={allWindsorCampaigns}
+                excluded={excludedCampaigns}
+                onChange={setExcludedCampaigns}
+              />
+
+              <div className="w-px h-4 bg-gray-200 mx-1 hidden sm:block" />
+
               {/* Apenas ativos toggle */}
               <button
                 onClick={(e) => { e.stopPropagation(); setOnlyActive((v) => !v) }}
@@ -456,10 +513,22 @@ export default function ConversionsSection({ pages }: Props) {
 
           <ChannelTable byChannel={byChannel} activeChannels={activeChannels} />
 
-          <AdTable byAd={byAd} />
+          <AdTable
+            byAd={byAd}
+            ceaConfig={ceaConfig}
+            syncing={ceaSyncing}
+            onSaveCeaConfig={saveCeaConfig}
+            rawWindsorRows={filteredWindsorRows}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            channels={activeChannels}
+            campaigns={selCampaigns}
+            adSets={selAdSets}
+            onlyActive={onlyActive}
+          />
 
           <QualityMetricsSection
-            rawWindsorRows={rawWindsorRows}
+            rawWindsorRows={filteredWindsorRows}
             dateFrom={dateFrom}
             dateTo={dateTo}
             channels={activeChannels}

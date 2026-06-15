@@ -26,6 +26,7 @@ export interface ChannelMetrics {
 
 export interface AdMetrics {
   ad: string
+  adFullName?: string  // full Windsor ad_name (e.g. "F177C1AD6 - Vídeo Dashboard 2025")
   spend: number
   mqls: number
   sqls: number
@@ -461,9 +462,15 @@ export function computeMetrics(
 
   // Step 1: Compute spend by ad (needed to resolve deal → spend key mapping)
   const spendByAd: Record<string, number> = {}
+  const adFullNames: Record<string, string> = {}
   for (const row of filteredWindsor) {
     const adKey = resolveAdKey(row)
     spendByAd[adKey] = (spendByAd[adKey] ?? 0) + (Number(row.spend) || 0)
+    // Store the longest raw ad_name seen for this key (prefers more descriptive names)
+    const rawName = (row.ad_name ?? '').trim()
+    if (rawName && (!adFullNames[adKey] || rawName.length > adFullNames[adKey].length)) {
+      adFullNames[adKey] = rawName
+    }
   }
   const spendKeys = new Set(Object.keys(spendByAd))
 
@@ -519,6 +526,7 @@ export function computeMetrics(
 
   const byAd: AdMetrics[] = [...allAds].sort().map((ad) => ({
     ad,
+    adFullName: adFullNames[ad],
     spend: spendByAd[ad] ?? 0,
     mqls: stageDealsByAd.mql[ad]?.size ?? 0,
     sqls: stageDealsByAd.sql[ad]?.size ?? 0,
