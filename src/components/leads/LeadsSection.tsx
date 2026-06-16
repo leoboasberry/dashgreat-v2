@@ -5,6 +5,8 @@ import { useExcludedCampaigns } from '../../hooks/useExcludedCampaigns'
 import { parseDealLeads, computeLeadCounts, STAGE_LABELS, STAGE_ORDER, fmtEventDateTime } from '../../utils/parseLeadDetail'
 import type { LeadSummary } from '../../utils/parseLeadDetail'
 import { extractFilterOptions } from '../../utils/computeMetrics'
+import { parseAllLeads, filterLeads } from '../../utils/parseLeads'
+import { normalizeCrmChannel } from '../../utils/channelNorm'
 import type { PageData } from '../../hooks/useDashboard'
 import MultiSelect from '../conversions/MultiSelect'
 import ExcludedCampaignsFilter from '../conversions/ExcludedCampaignsFilter'
@@ -194,6 +196,28 @@ export default function LeadsSection({ pages }: Props) {
       setSelPages(adsPages)
     }
   }, [pageOptions])
+
+  // GreatPages total leads (same filters as Conversões)
+  const gpLeadsCount = useMemo(() => {
+    let leads = filterLeads(parseAllLeads(pages), { dateFrom, dateTo })
+    if (selChannels.length > 0) {
+      leads = leads.filter((l) => selChannels.includes(normalizeCrmChannel(undefined, l.utmSource)))
+    }
+    if (selCampaigns.length > 0) {
+      leads = leads.filter((l) => selCampaigns.includes(l.campaign))
+    }
+    if (selAdSets.length > 0) {
+      leads = leads.filter((l) => selAdSets.includes(l.adSet))
+    }
+    if (selAds.length > 0) {
+      leads = leads.filter((l) => selAds.includes(l.ad))
+    }
+    if (selPages.length > 0) {
+      const selectedTitles = new Set(selPages.map((id) => pageNameMap.get(id) ?? id))
+      leads = leads.filter((l) => selectedTitles.has(l.pageName))
+    }
+    return leads.length
+  }, [pages, dateFrom, dateTo, selChannels, selCampaigns, selAdSets, selAds, selPages, pageNameMap])
 
   // All channels from leads
   const allChannels = useMemo(() => {
@@ -412,7 +436,7 @@ export default function LeadsSection({ pages }: Props) {
         <>
           {/* KPI Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-            <KpiCard label="Total Leads" value={counts.total} color="text-gray-800" />
+            <KpiCard label="Total Leads" value={gpLeadsCount} color="text-gray-800" />
             <KpiCard label="MQLs" value={counts.mqls} color="text-blue-700" />
             <KpiCard label="SQLs" value={counts.sqls} color="text-indigo-700" />
             <KpiCard label="Não Qual." value={counts.notMql} color="text-gray-500" />

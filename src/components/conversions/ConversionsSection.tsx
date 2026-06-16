@@ -179,8 +179,13 @@ export default function ConversionsSection({ pages }: Props) {
     if (selAds.length > 0) {
       leads = leads.filter((l) => selAds.includes(l.ad))
     }
+    if (selPages.length > 0) {
+      // selPages holds GreatPages page IDs; map to titles to compare with l.pageName
+      const selectedTitles = new Set(selPages.map((id) => pageNameMap.get(id) ?? id))
+      leads = leads.filter((l) => selectedTitles.has(l.pageName))
+    }
     return leads
-  }, [pages, dateFrom, dateTo, activeChannels, selCampaigns, selAdSets, selAds])
+  }, [pages, dateFrom, dateTo, activeChannels, selCampaigns, selAdSets, selAds, selPages, pageNameMap])
 
   const totalLeads = filteredLeadsList.length
 
