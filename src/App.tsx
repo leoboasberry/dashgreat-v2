@@ -9,6 +9,7 @@ import PageRow from './components/PageRow'
 import SummaryChart from './components/SummaryChart'
 import CampaignsSection from './components/campaigns/CampaignsSection'
 import ConversionsSection from './components/conversions/ConversionsSection'
+import LeadsSection from './components/leads/LeadsSection'
 import { clearAllCache } from './api/cache'
 
 const STORAGE_KEY = 'gp_config'
@@ -29,7 +30,7 @@ const ENV_CONFIG: Config | null =
 // Password stored as plain text env var (VITE_GP_PASSWORD) or as SHA-256 hash in localStorage
 const ENV_PASSWORD: string = (import.meta.env.VITE_GP_PASSWORD as string) ?? ''
 
-type Tab = 'overview' | 'campaigns' | 'conversions'
+type Tab = 'overview' | 'campaigns' | 'conversions' | 'leads'
 
 function loadConfig(): Config | null {
   try {
@@ -174,6 +175,9 @@ export default function App() {
             <TabButton active={activeTab === 'conversions'} onClick={() => setActiveTab('conversions')}>
               Conversões
             </TabButton>
+            <TabButton active={activeTab === 'leads'} onClick={() => setActiveTab('leads')}>
+              Leads do Dia
+            </TabButton>
             <TabButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>
               Visão Geral
             </TabButton>
@@ -254,6 +258,9 @@ export default function App() {
 
             {/* ── Conversões ── */}
             {activeTab === 'conversions' && <ConversionsSection pages={pages} />}
+
+            {/* ── Leads do Dia ── */}
+            {activeTab === 'leads' && <LeadsSection pages={pages} />}
 
             {/* ── Origem & Campanhas ── */}
             {activeTab === 'campaigns' && (
