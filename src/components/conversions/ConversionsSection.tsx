@@ -18,7 +18,7 @@ import PacingSection from './PacingSection'
 import QualityMetricsSection from './QualityMetricsSection'
 import MultiSelect from './MultiSelect'
 import ExcludedCampaignsFilter from './ExcludedCampaignsFilter'
-import { currentMonthBRT } from '../../utils/dateBRT'
+import { currentMonthBRT, yesterdayBRT, getDatePresets } from '../../utils/dateBRT'
 
 function currentMonthRange() {
   return currentMonthBRT()
@@ -196,9 +196,7 @@ export default function ConversionsSection({ pages }: Props) {
       if (totalBudget === 0) return { pacingDeveria: null, pacingBudget: 0 }
       const from = new Date(dateFrom + 'T12:00:00')
       const to = new Date(dateTo + 'T12:00:00')
-      const yesterday = new Date()
-      yesterday.setHours(12, 0, 0, 0)
-      yesterday.setDate(yesterday.getDate() - 1)
+      const yesterday = new Date(yesterdayBRT() + 'T12:00:00')
       const effectiveTo = to < yesterday ? to : yesterday
       const elapsed = Math.max(1, Math.round((effectiveTo.getTime() - from.getTime()) / 86_400_000) + 1)
       const total = new Date(from.getFullYear(), from.getMonth() + 1, 0).getDate()
@@ -318,22 +316,39 @@ export default function ConversionsSection({ pages }: Props) {
           <div className="px-4 pb-4 flex flex-col gap-3 border-t border-gray-100">
             {/* Row 1: Period + Channel + Refresh */}
             <div className="flex flex-wrap items-center gap-4 pt-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-gray-400 font-medium">Período</span>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0D2F9F] focus:border-transparent"
-                />
-                <span className="text-xs text-gray-400">até</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  min={dateFrom}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0D2F9F] focus:border-transparent"
-                />
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-gray-400 font-medium">Período</span>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0D2F9F] focus:border-transparent"
+                  />
+                  <span className="text-xs text-gray-400">até</span>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0D2F9F] focus:border-transparent"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {getDatePresets().map(({ label, from, to }) => (
+                    <button
+                      key={label}
+                      onClick={() => { setDateFrom(from); setDateTo(to) }}
+                      className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+                        dateFrom === from && dateTo === to
+                          ? 'border-[#0D2F9F] bg-blue-50 text-[#0D2F9F] font-medium'
+                          : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="w-px h-5 bg-gray-200 hidden sm:block" />

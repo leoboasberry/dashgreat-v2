@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { yesterdayBRT } from '../../utils/dateBRT'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import {
   BarChart,
@@ -76,7 +77,7 @@ export default function InvestmentChart({ data, activeChannels, dateFrom, dateTo
 
   // Days elapsed in period (for context)
   const fromDate = new Date(dateFrom + 'T12:00:00')
-  const today = new Date(); today.setHours(12, 0, 0, 0); today.setDate(today.getDate() - 1)
+  const today = new Date(yesterdayBRT() + 'T12:00:00')
   const effectiveTo = toDate < today ? toDate : today
   const elapsed = Math.max(1, Math.round((effectiveTo.getTime() - fromDate.getTime()) / 86_400_000) + 1)
   const avgAllPeriod = elapsed > 0

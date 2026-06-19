@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { yesterdayBRT } from '../../utils/dateBRT'
 import { Settings2, Loader2 } from 'lucide-react'
 import { CHANNELS, type Channel } from '../../utils/channelNorm'
 import type { ChannelMetrics } from '../../hooks/useConversionsData'
@@ -49,9 +50,7 @@ function statusLabel(pct: number): string {
 function pacingDays(dateFrom: string, dateTo: string): { elapsed: number; total: number } {
   const from = new Date(dateFrom + 'T12:00:00')
   const to = new Date(dateTo + 'T12:00:00')
-  const yesterday = new Date()
-  yesterday.setHours(12, 0, 0, 0)
-  yesterday.setDate(yesterday.getDate() - 1)
+  const yesterday = new Date(yesterdayBRT() + 'T12:00:00')
 
   const effectiveTo = to < yesterday ? to : yesterday
   const elapsed = Math.max(1, Math.round((effectiveTo.getTime() - from.getTime()) / 86_400_000) + 1)

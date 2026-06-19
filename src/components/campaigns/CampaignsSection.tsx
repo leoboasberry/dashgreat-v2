@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { currentMonthBRT } from '../../utils/dateBRT'
+import { currentMonthBRT, getDatePresets } from '../../utils/dateBRT'
 import { Users, TrendingUp } from 'lucide-react'
 import type { PageData } from '../../hooks/useDashboard'
 import {
@@ -88,6 +88,21 @@ export default function CampaignsSection({ pages }: Props) {
       {/* Filters */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Filtros</h3>
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {getDatePresets().map(({ label, from, to }) => (
+            <button
+              key={label}
+              onClick={() => { setDateFrom(from); setDateTo(to) }}
+              className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+                dateFrom === from && dateTo === to
+                  ? 'border-[#0D2F9F] bg-blue-50 text-[#0D2F9F] font-medium'
+                  : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <FilterField label="Data inicial">
             <input

@@ -11,13 +11,7 @@ import type { PageData } from '../../hooks/useDashboard'
 import MultiSelect from '../conversions/MultiSelect'
 import ExcludedCampaignsFilter from '../conversions/ExcludedCampaignsFilter'
 import LeadModal from './LeadModal'
-import { todayBRT, yesterdayBRT, daysAgoBRT } from '../../utils/dateBRT'
-
-// ── Date helpers (BRT-aware) ──
-
-const todayStr = todayBRT
-const yesterdayStr = yesterdayBRT
-function daysAgoStr(n: number) { return daysAgoBRT(n) }
+import { todayBRT, getDatePresets } from '../../utils/dateBRT'
 
 // ── Stage badge ──
 
@@ -89,7 +83,7 @@ interface Props {
 }
 
 export default function LeadsSection({ pages }: Props) {
-  const today = todayStr()
+  const today = todayBRT()
   const [dateFrom, setDateFrom] = useState(today)
   const [dateTo, setDateTo] = useState(today)
 
@@ -313,18 +307,14 @@ export default function LeadsSection({ pages }: Props) {
           </div>
 
           {/* Quick shortcuts */}
-          <div className="flex items-center gap-1.5 ml-1">
-            {[
-              { label: 'Hoje', from: today, to: today },
-              { label: 'Ontem', from: yesterdayStr(), to: yesterdayStr() },
-              { label: 'Últimos 7 dias', from: daysAgoStr(6), to: today },
-            ].map(({ label, from, to }) => {
+          <div className="flex flex-wrap items-center gap-1.5 ml-1">
+            {getDatePresets().map(({ label, from, to }) => {
               const isActive = dateFrom === from && dateTo === to
               return (
                 <button
                   key={label}
                   onClick={() => setQuickDate(from, to)}
-                  className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+                  className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
                     isActive
                       ? 'border-[#0D2F9F] bg-blue-50 text-[#0D2F9F] font-medium'
                       : 'border-gray-200 text-gray-500 hover:bg-gray-50'
