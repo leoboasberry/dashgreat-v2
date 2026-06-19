@@ -56,10 +56,14 @@ function extractHour(valor: string): number {
     const d = new Date(valor)
     if (!isNaN(d.getTime())) return toBRTHour(d.getTime())
   }
-  // ISO datetime: 2024-01-15T10:30:00 or 2024-01-15 10:30:00 (assumed BRT)
-  const isoTime = valor.match(/[\sT](\d{2}):\d{2}/)
-  if (isoTime) return parseInt(isoTime[1]!, 10)
-  // BR datetime: 15/01/2024 10:30
+  // ISO datetime without Z (e.g. "2026-06-19 01:30:00") — GreatPages stores UTC
+  const isoDatetime = valor.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/)
+  if (isoDatetime) {
+    const d = new Date(valor.replace(' ', 'T') + 'Z')
+    if (!isNaN(d.getTime())) return toBRTHour(d.getTime())
+    return parseInt(isoDatetime[2]!.slice(0, 2), 10)
+  }
+  // BR datetime: 15/01/2024 10:30 — stored in BRT, use directly
   const brTime = valor.match(/\d{2}\/\d{2}\/\d{4}[\sT](\d{2}):\d{2}/)
   if (brTime) return parseInt(brTime[1]!, 10)
   // Unix timestamp (UTC) → convert to BRT
@@ -73,15 +77,23 @@ function extractHour(valor: string): number {
 
 function extractDate(valor: string): string {
   if (!valor) return ''
-  // ISO with explicit UTC (Z suffix) → convert to BRT before extracting date
+  // ISO with explicit UTC (Z suffix) → convert to BRT
   if (/Z$/.test(valor)) {
     const d = new Date(valor)
     if (!isNaN(d.getTime())) return toBRTDate(d.getTime())
   }
-  // ISO: 2024-01-15 or 2024-01-15T10:00:00 (no timezone = assumed BRT)
+  // ISO datetime without Z (e.g. "2026-06-19 01:30:00") — GreatPages stores UTC
+  if (/^\d{4}-\d{2}-\d{2}[T ]/.test(valor)) {
+    const d = new Date(valor.replace(' ', 'T') + 'Z')
+    if (!isNaN(d.getTime())) return toBRTDate(d.getTime())
+  }
+  // Date-only ISO: "2026-06-16" — no time = no timezone ambiguity, use as-is
+  const isoDate = valor.match(/^(\d{4}-\d{2}-\d{2})$/)
+  if (isoDate) return isoDate[1]!
+  // Fallback: ISO date anywhere in string
   const iso = valor.match(/(\d{4}-\d{2}-\d{2})/)
   if (iso) return iso[1]!
-  // BR: 15/01/2024
+  // BR: 15/01/2024 — stored in BRT, use directly
   const br = valor.match(/(\d{2})\/(\d{2})\/(\d{4})/)
   if (br) return `${br[3]}-${br[2]}-${br[1]}`
   // Unix timestamp (UTC) → convert to BRT
