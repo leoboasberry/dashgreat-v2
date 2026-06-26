@@ -165,6 +165,9 @@ export default function ConversionsSection({ pages }: Props) {
   // GreatPages leads filtered by date + active filters
   const filteredLeadsList = useMemo(() => {
     let leads = filterLeads(parseAllLeads(pages), { dateFrom, dateTo })
+    if (excludedCodes.length > 0) {
+      leads = leads.filter((l) => !excludedCodes.includes(l.campaign))
+    }
     if (activeChannels.length > 0) {
       leads = leads.filter((l) => activeChannels.includes(normalizeCrmChannel(undefined, l.utmSource)))
     }
@@ -183,7 +186,7 @@ export default function ConversionsSection({ pages }: Props) {
       leads = leads.filter((l) => selectedTitles.has(l.pageName))
     }
     return leads
-  }, [pages, dateFrom, dateTo, activeChannels, selCampaigns, selAdSets, selAds, selPages, pageNameMap])
+  }, [pages, dateFrom, dateTo, excludedCodes, activeChannels, selCampaigns, selAdSets, selAds, selPages, pageNameMap])
 
   const totalLeads = filteredLeadsList.length
 
