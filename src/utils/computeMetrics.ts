@@ -367,8 +367,9 @@ export function computeMetrics(
   const spendByDateChannel: Record<string, Record<Channel, number>> = {}
   const isActiveCampaign = (s?: string) => s === 'ENABLED' || s === 'ACTIVE'
 
-  // Track latest row per campaign key to resolve daily_budget and active status
+  // Track latest row per campaign and adset for budget lookup
   const latestCampaignRow: Record<string, WindsorRow> = {}
+  const latestAdsetRow: Record<string, WindsorRow> = {}
 
   for (const row of filteredWindsor) {
     if (!row.date) continue
@@ -382,20 +383,51 @@ export function computeMetrics(
     }
     spendByDateChannel[row.date][ch] += spend
 
-    // Keep the most recent row per campaign for daily_budget lookup
     const cc = extractCampaignCode(row.campaign ?? '')
     if (!latestCampaignRow[cc] || row.date > latestCampaignRow[cc].date) {
       latestCampaignRow[cc] = row
     }
+    const adsetKey = wCodes(row).adSet
+    if (adsetKey && (!latestAdsetRow[adsetKey] || row.date > latestAdsetRow[adsetKey].date)) {
+      latestAdsetRow[adsetKey] = row
+    }
   }
 
-  // Average daily spend per channel = total spend / unique days in dataset
+  // Daily budget per channel from platform fields (campaign or adset level)
+  // Meta returns budgets in cents → divide by 100; Google returns in currency units
   const activeSpendByChannel: Record<Channel, number> = Object.fromEntries(
     CHANNELS.map((c) => [c, 0]),
   ) as Record<Channel, number>
-  const uniqueDays = Object.keys(spendByDateChannel).length || 1
-  for (const ch of CHANNELS) {
-    activeSpendByChannel[ch] = spendByChannel[ch] / uniqueDays
+  const isMetaDatasource = (ds: string) =>
+    ds === 'facebook' || ds === 'meta' || ds === 'instagram'
+  const parseBudget = (raw: number | null | undefined, datasource: string): number => {
+    const n = Number(raw) || 0
+    return isMetaDatasource(datasource) ? n / 100 : n
+  }
+
+  // Step 1: campaign-level budgets (Meta: campaign_daily_budget, Google: campaign_budget)
+  const campaignsWithCampaignBudget = new Set<string>()
+  for (const [cc, row] of Object.entries(latestCampaignRow)) {
+    if (!isActiveCampaign(row.campaign_status)) continue
+    const rawBudget = row.campaign_daily_budget ?? row.campaign_budget
+    const budget = parseBudget(rawBudget, row.datasource)
+    if (budget > 0) {
+      const ch = normalizeWindsorChannel(row.datasource, row.source)
+      activeSpendByChannel[ch] += budget
+      campaignsWithCampaignBudget.add(cc)
+    }
+  }
+
+  // Step 2: adset-level budgets (Meta: adset_daily_budget) for campaigns without campaign-level budget
+  for (const [, row] of Object.entries(latestAdsetRow)) {
+    if (!isActiveCampaign(row.campaign_status)) continue
+    const cc = extractCampaignCode(row.campaign ?? '')
+    if (campaignsWithCampaignBudget.has(cc)) continue
+    const budget = parseBudget(row.adset_daily_budget, row.datasource)
+    if (budget > 0) {
+      const ch = normalizeWindsorChannel(row.datasource, row.source)
+      activeSpendByChannel[ch] += budget
+    }
   }
 
   const totalSpend = Object.values(spendByChannel).reduce((a, b) => a + b, 0)
