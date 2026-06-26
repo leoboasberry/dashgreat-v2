@@ -29,7 +29,7 @@ function ticketMedio(mrr: number, won: number): string {
   return (mrr / won).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 }
 
-type SortKey = 'spend' | 'mqls' | 'cpmql' | 'sqls' | 'cpsql' | 'opportunities' | 'meetings' | 'won' | 'cpa' | 'mrr' | 'ticket'
+type SortKey = 'spend' | 'dailyBudget' | 'mqls' | 'cpmql' | 'sqls' | 'cpsql' | 'opportunities' | 'meetings' | 'won' | 'cpa' | 'mrr' | 'ticket'
 
 function sortValAd(r: AdMetrics, key: SortKey): number {
   switch (key) {
@@ -50,6 +50,7 @@ function sortValAd(r: AdMetrics, key: SortKey): number {
 function sortValCampaign(r: CampaignMetrics, key: SortKey): number {
   switch (key) {
     case 'spend': return r.spend
+    case 'dailyBudget': return r.dailyBudget
     case 'mqls': return r.mqls
     case 'cpmql': return r.mqls > 0 ? r.spend / r.mqls : 0
     case 'sqls': return r.sqls
@@ -66,6 +67,7 @@ function sortValCampaign(r: CampaignMetrics, key: SortKey): number {
 function sortValAdSet(r: AdSetMetrics, key: SortKey): number {
   switch (key) {
     case 'spend': return r.spend
+    case 'dailyBudget': return r.dailyBudget
     case 'mqls': return r.mqls
     case 'cpmql': return r.mqls > 0 ? r.spend / r.mqls : 0
     case 'sqls': return r.sqls
@@ -100,6 +102,7 @@ const COL_KEYS_CAMPAIGN: { label: string; key: SortKey | null }[] = [
   { label: 'Campanha', key: null },
   { label: 'Status', key: null },
   { label: 'Investimento', key: 'spend' },
+  { label: 'Orç./dia', key: 'dailyBudget' },
   { label: 'MQLs', key: 'mqls' },
   { label: 'CPMQL', key: 'cpmql' },
   { label: 'SQLs', key: 'sqls' },
@@ -117,6 +120,7 @@ const COL_KEYS_ADSET: { label: string; key: SortKey | null }[] = [
   { label: 'Conjunto', key: null },
   { label: 'Status', key: null },
   { label: 'Investimento', key: 'spend' },
+  { label: 'Orç./dia', key: 'dailyBudget' },
   { label: 'MQLs', key: 'mqls' },
   { label: 'CPMQL', key: 'cpmql' },
   { label: 'SQLs', key: 'sqls' },
@@ -278,20 +282,20 @@ export default function AdTable({
 
   const campaignTotal = byCampaign.reduce(
     (acc, r) => ({
-      campaign: 'Total', spend: acc.spend + r.spend, mqls: acc.mqls + r.mqls,
-      sqls: acc.sqls + r.sqls, opportunities: acc.opportunities + r.opportunities,
+      campaign: 'Total', spend: acc.spend + r.spend, dailyBudget: acc.dailyBudget + r.dailyBudget,
+      mqls: acc.mqls + r.mqls, sqls: acc.sqls + r.sqls, opportunities: acc.opportunities + r.opportunities,
       meetings: acc.meetings + r.meetings, won: acc.won + r.won, mrr: acc.mrr + r.mrr,
     }),
-    { campaign: 'Total', spend: 0, mqls: 0, sqls: 0, opportunities: 0, meetings: 0, won: 0, mrr: 0 },
+    { campaign: 'Total', spend: 0, dailyBudget: 0, mqls: 0, sqls: 0, opportunities: 0, meetings: 0, won: 0, mrr: 0 },
   )
 
   const adSetTotal = byAdSet.reduce(
     (acc, r) => ({
-      adSet: 'Total', spend: acc.spend + r.spend, mqls: acc.mqls + r.mqls,
-      sqls: acc.sqls + r.sqls, opportunities: acc.opportunities + r.opportunities,
+      adSet: 'Total', spend: acc.spend + r.spend, dailyBudget: acc.dailyBudget + r.dailyBudget,
+      mqls: acc.mqls + r.mqls, sqls: acc.sqls + r.sqls, opportunities: acc.opportunities + r.opportunities,
       meetings: acc.meetings + r.meetings, won: acc.won + r.won, mrr: acc.mrr + r.mrr,
     }),
-    { adSet: 'Total', spend: 0, mqls: 0, sqls: 0, opportunities: 0, meetings: 0, won: 0, mrr: 0 },
+    { adSet: 'Total', spend: 0, dailyBudget: 0, mqls: 0, sqls: 0, opportunities: 0, meetings: 0, won: 0, mrr: 0 },
   )
 
   return (
@@ -475,6 +479,7 @@ export default function AdTable({
                       </td>
                       <td className="px-3 py-2.5 text-center"><StatusBadge status={r.status} /></td>
                       <td className="px-3 py-2.5 text-right text-gray-700">{fmtBRL(r.spend)}</td>
+                      <td className="px-3 py-2.5 text-right text-gray-700">{fmtBRL(r.dailyBudget)}</td>
                       <td className="px-3 py-2.5 text-right text-gray-700">{fmtN(r.mqls)}</td>
                       <td className="px-3 py-2.5 text-right text-gray-500 text-xs">{ratio(r.spend, r.mqls)}</td>
                       <td className="px-3 py-2.5 text-right text-gray-700"><Tip label={tipPct(r.sqls, r.mqls, 'MQL→SQL')}>{fmtN(r.sqls)}</Tip></td>
@@ -493,6 +498,7 @@ export default function AdTable({
                   <td className="px-3 py-2.5 max-w-[260px]"><span className="block truncate text-gray-800">Total</span></td>
                   <td className="px-3 py-2.5 text-center" />
                   <td className="px-3 py-2.5 text-right text-gray-700">{fmtBRL(adSetTotal.spend)}</td>
+                  <td className="px-3 py-2.5 text-right text-gray-700">{fmtBRL(adSetTotal.dailyBudget)}</td>
                   <td className="px-3 py-2.5 text-right text-gray-700">{fmtN(adSetTotal.mqls)}</td>
                   <td className="px-3 py-2.5 text-right text-gray-500 text-xs">{ratio(adSetTotal.spend, adSetTotal.mqls)}</td>
                   <td className="px-3 py-2.5 text-right text-gray-700">{fmtN(adSetTotal.sqls)}</td>
@@ -553,6 +559,7 @@ export default function AdTable({
                       </td>
                       <td className="px-3 py-2.5 text-center"><StatusBadge status={r.status} /></td>
                       <td className="px-3 py-2.5 text-right text-gray-700">{fmtBRL(r.spend)}</td>
+                      <td className="px-3 py-2.5 text-right text-gray-700">{fmtBRL(r.dailyBudget)}</td>
                       <td className="px-3 py-2.5 text-right text-gray-700">{fmtN(r.mqls)}</td>
                       <td className="px-3 py-2.5 text-right text-gray-500 text-xs">{ratio(r.spend, r.mqls)}</td>
                       <td className="px-3 py-2.5 text-right text-gray-700"><Tip label={tipPct(r.sqls, r.mqls, 'MQL→SQL')}>{fmtN(r.sqls)}</Tip></td>
@@ -571,6 +578,7 @@ export default function AdTable({
                   <td className="px-3 py-2.5 max-w-[260px]"><span className="block truncate text-gray-800">Total</span></td>
                   <td className="px-3 py-2.5 text-center" />
                   <td className="px-3 py-2.5 text-right text-gray-700">{fmtBRL(campaignTotal.spend)}</td>
+                  <td className="px-3 py-2.5 text-right text-gray-700">{fmtBRL(campaignTotal.dailyBudget)}</td>
                   <td className="px-3 py-2.5 text-right text-gray-700">{fmtN(campaignTotal.mqls)}</td>
                   <td className="px-3 py-2.5 text-right text-gray-500 text-xs">{ratio(campaignTotal.spend, campaignTotal.mqls)}</td>
                   <td className="px-3 py-2.5 text-right text-gray-700">{fmtN(campaignTotal.sqls)}</td>

@@ -42,6 +42,7 @@ export interface AdSetMetrics {
   adSet: string
   adSetFullName?: string  // full Windsor adset_name
   spend: number
+  dailyBudget: number
   mqls: number
   sqls: number
   opportunities: number
@@ -55,6 +56,7 @@ export interface CampaignMetrics {
   campaign: string
   campaignFullName?: string  // full Windsor campaign name
   spend: number
+  dailyBudget: number
   mqls: number
   sqls: number
   opportunities: number
@@ -430,6 +432,26 @@ export function computeMetrics(
     }
   }
 
+  // Daily budget per campaign (campaign-level first, then sum adset-level)
+  const budgetByCampaign: Record<string, number> = {}
+  for (const [cc, row] of Object.entries(latestCampaignRow)) {
+    const rawBudget = row.campaign_daily_budget ?? row.campaign_budget
+    const b = parseBudget(rawBudget, row.datasource)
+    if (b > 0) budgetByCampaign[cc] = b
+  }
+  for (const [, row] of Object.entries(latestAdsetRow)) {
+    const cc = extractCampaignCode(row.campaign ?? '')
+    if (budgetByCampaign[cc] !== undefined) continue // campaign already has budget
+    const b = parseBudget(row.adset_daily_budget, row.datasource)
+    if (b > 0) budgetByCampaign[cc] = (budgetByCampaign[cc] ?? 0) + b
+  }
+
+  // Daily budget per adset (adset_daily_budget only — null when budget is at campaign level)
+  const budgetByAdSet: Record<string, number> = {}
+  for (const [adsetKey, row] of Object.entries(latestAdsetRow)) {
+    budgetByAdSet[adsetKey] = parseBudget(row.adset_daily_budget, row.datasource)
+  }
+
   const totalSpend = Object.values(spendByChannel).reduce((a, b) => a + b, 0)
   const dailySpend: DailySpend[] = Object.entries(spendByDateChannel)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -694,6 +716,7 @@ export function computeMetrics(
     adSet,
     adSetFullName: adSetFullNames[adSet],
     spend: spendByAdSet[adSet] ?? 0,
+    dailyBudget: budgetByAdSet[adSet] ?? 0,
     mqls: stageDealsByAdSet.mql[adSet]?.size ?? 0,
     sqls: stageDealsByAdSet.sql[adSet]?.size ?? 0,
     opportunities: stageDealsByAdSet.opportunity[adSet]?.size ?? 0,
@@ -757,6 +780,7 @@ export function computeMetrics(
     campaign,
     campaignFullName: campaignFullNames[campaign],
     spend: spendByCampaign[campaign] ?? 0,
+    dailyBudget: budgetByCampaign[campaign] ?? 0,
     mqls: stageDealsByCampaign.mql[campaign]?.size ?? 0,
     sqls: stageDealsByCampaign.sql[campaign]?.size ?? 0,
     opportunities: stageDealsByCampaign.opportunity[campaign]?.size ?? 0,
