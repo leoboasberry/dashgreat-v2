@@ -34,6 +34,7 @@ type SortKey = 'spend' | 'dailyBudget' | 'mqls' | 'cpmql' | 'sqls' | 'cpsql' | '
 function sortValAd(r: AdMetrics, key: SortKey): number {
   switch (key) {
     case 'spend': return r.spend
+    case 'dailyBudget': return 0
     case 'mqls': return r.mqls
     case 'cpmql': return r.mqls > 0 ? r.spend / r.mqls : 0
     case 'sqls': return r.sqls
