@@ -519,8 +519,6 @@ export default function ConversionsSection({ pages }: Props) {
 
           <InvestmentChart data={dailySpend} activeChannels={activeChannels} dateFrom={dateFrom} dateTo={dateTo} />
 
-          <FunnelChart funnel={funnelCounts} />
-
           <ChannelTable byChannel={byChannel} activeChannels={activeChannels} />
 
           <AdTable

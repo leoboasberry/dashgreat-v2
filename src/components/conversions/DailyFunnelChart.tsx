@@ -10,6 +10,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceArea,
 } from 'recharts'
 import type { DailyFunnelPoint } from '../../utils/computeMetrics'
 import type { ParsedLead } from '../../utils/parseLeads'
@@ -99,6 +100,30 @@ export default function DailyFunnelChart({ dailyFunnel, filteredLeads }: Props) 
       cpmql: mqls > 0 && spend > 0 ? Math.round(spend / mqls) : null,
     }
   })
+
+  // Weekend bands for chart background shading
+  const weekendBands: { x1: string; x2: string }[] = []
+  {
+    const dates = data.map((p) => p.date)
+    for (let i = 0; i < dates.length; i++) {
+      const [y, m, d] = dates[i]!.split('-').map(Number)
+      const dow = new Date(y!, m! - 1, d!).getDay()
+      if (dow === 6) {
+        const next = dates[i + 1]
+        if (next) {
+          const [y2, m2, d2] = next.split('-').map(Number)
+          if (new Date(y2!, m2! - 1, d2!).getDay() === 0) {
+            weekendBands.push({ x1: dates[i]!, x2: next })
+            i++
+            continue
+          }
+        }
+        weekendBands.push({ x1: dates[i]!, x2: dates[i]! })
+      } else if (dow === 0) {
+        weekendBands.push({ x1: dates[i]!, x2: dates[i]! })
+      }
+    }
+  }
 
   const totalMQLs = dailyFunnel.reduce((s, p) => s + p.mqls, 0)
   const totalSpend = dailyFunnel.reduce((s, p) => s + p.spend, 0)
@@ -227,6 +252,18 @@ export default function DailyFunnelChart({ dailyFunnel, filteredLeads }: Props) 
               )}
               <Tooltip content={<CustomTooltip />} />
 
+              {weekendBands.map(({ x1, x2 }) => (
+                <ReferenceArea
+                  key={x1}
+                  x1={x1}
+                  x2={x2}
+                  yAxisId={showLeftAxis ? 'count' : 'cost'}
+                  fill="#e2e8f0"
+                  fillOpacity={0.45}
+                  strokeOpacity={0}
+                />
+              ))}
+
               {active.has('leads') && (
                 <Line
                   yAxisId="count"
@@ -239,7 +276,7 @@ export default function DailyFunnelChart({ dailyFunnel, filteredLeads }: Props) 
                   activeDot={{ r: 4 }}
                   connectNulls={false}
                 >
-                  <LabelList dataKey="leads" position="top" style={{ fontSize: 11, fill: '#a5b4fc' }} />
+                  <LabelList dataKey="leads" position="top" style={{ fontSize: 11, fill: '#818cf8' }} />
                 </Line>
               )}
 
@@ -255,7 +292,7 @@ export default function DailyFunnelChart({ dailyFunnel, filteredLeads }: Props) 
                   activeDot={{ r: 4 }}
                   connectNulls={false}
                 >
-                  <LabelList dataKey="mqls" position="bottom" style={{ fontSize: 11, fill: '#93c5fd' }} />
+                  <LabelList dataKey="mqls" position="top" style={{ fontSize: 11, fill: '#4b7cf7' }} />
                 </Line>
               )}
 
@@ -275,8 +312,8 @@ export default function DailyFunnelChart({ dailyFunnel, filteredLeads }: Props) 
                   <LabelList
                     dataKey="cpmql"
                     position="top"
-                    formatter={(v: number) => `${Math.round(v / 1000)}k`}
-                    style={{ fontSize: 11, fill: '#fcd34d' }}
+                    formatter={(v: number) => `${parseFloat((v / 1000).toFixed(2))}k`}
+                    style={{ fontSize: 11, fill: '#d97706' }}
                   />
                 </Line>
               )}

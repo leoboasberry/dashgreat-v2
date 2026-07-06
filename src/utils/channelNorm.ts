@@ -25,8 +25,8 @@ export function normalizeWindsorChannel(datasource: string, source?: string): Ch
 }
 
 export const CHANNEL_COLORS: Record<Channel, string> = {
-  Google: '#3B5EC8',
-  Meta: '#0D2F9F',
+  Google: '#EA4335',
+  Meta: '#1877F2',
   Bing: '#00809D',
   LinkedIn: '#1a4cb0',
   TikTok: '#010101',
