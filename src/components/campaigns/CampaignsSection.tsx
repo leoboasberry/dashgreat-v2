@@ -11,6 +11,8 @@ import {
   allUniqueAdSets,
   allUniqueAds,
   allUniquePages,
+  allFaturamentoRanges,
+  normalizeFaturamento,
 } from '../../utils/parseLeads'
 import MetricCard from '../MetricCard'
 import LeadsTimelineChart from './LeadsTimelineChart'
@@ -33,6 +35,7 @@ export default function CampaignsSection({ pages }: Props) {
   const sources = useMemo(() => allUniqueSources(allLeads), [allLeads])
   const campaignCodes = useMemo(() => allUniqueCampaignCodes(allLeads), [allLeads])
   const pageOptions = useMemo(() => allUniquePages(allLeads), [allLeads])
+  const faturamentoOptions = useMemo(() => allFaturamentoRanges(allLeads), [allLeads])
 
   // Filter state — default to current month (BRT)
   const [dateFrom, setDateFrom] = useState(() => currentMonthBRT().from)
@@ -42,6 +45,7 @@ export default function CampaignsSection({ pages }: Props) {
   const [adSetFilter, setAdSetFilter] = useState('')
   const [adFilter, setAdFilter] = useState('')
   const [pageFilter, setPageFilter] = useState('')
+  const [faturamentoFilter, setFaturamentoFilter] = useState('')
   const [stackBySource, setStackBySource] = useState(false)
 
   // Cascading options
@@ -73,13 +77,29 @@ export default function CampaignsSection({ pages }: Props) {
       adSetCode: adSetFilter,
       adCode: adFilter,
       pageName: pageFilter,
+      faturamento: faturamentoFilter,
     }),
-    [allLeads, dateFrom, dateTo, sourceFilter, campaignCodeFilter, adSetFilter, adFilter, pageFilter],
+    [allLeads, dateFrom, dateTo, sourceFilter, campaignCodeFilter, adSetFilter, adFilter, pageFilter, faturamentoFilter],
   )
 
   const smallRevenueCount = filtered.filter(isSmallRevenue).length
   const smallRevenuePct =
     filtered.length > 0 ? ((smallRevenueCount / filtered.length) * 100).toFixed(1) : '0.0'
+
+  const faturamentoBreakdown = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const l of filtered) {
+      const key = normalizeFaturamento(l.faturamento) || '(não informado)'
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([range, count]) => ({
+        range,
+        count,
+        pct: filtered.length > 0 ? ((count / filtered.length) * 100).toFixed(1) : '0.0',
+      }))
+  }, [filtered])
 
   const hasDateData = allLeads.some((l) => l.date)
 
@@ -136,6 +156,16 @@ export default function CampaignsSection({ pages }: Props) {
               ))}
             </select>
           </FilterField>
+          {faturamentoOptions.length > 0 && (
+            <FilterField label="Faturamento">
+              <select value={faturamentoFilter} onChange={(e) => setFaturamentoFilter(e.target.value)} className={SELECT_CLS}>
+                <option value="">Todas as faixas</option>
+                {faturamentoOptions.map((f) => (
+                  <option key={f} value={f}>{f}</option>
+                ))}
+              </select>
+            </FilterField>
+          )}
         </div>
 
         {/* Campaign hierarchy row */}
@@ -179,11 +209,12 @@ export default function CampaignsSection({ pages }: Props) {
           </div>
         </div>
 
-        {(dateFrom || dateTo || sourceFilter || campaignCodeFilter || adSetFilter || adFilter || pageFilter) && (
+        {(dateFrom || dateTo || sourceFilter || campaignCodeFilter || adSetFilter || adFilter || pageFilter || faturamentoFilter) && (
           <button
             onClick={() => {
               setDateFrom(''); setDateTo(''); setSourceFilter('')
               setCampaignCodeFilter(''); setAdSetFilter(''); setAdFilter(''); setPageFilter('')
+              setFaturamentoFilter('')
             }}
             className="mt-3 text-xs text-[#0D2F9F] hover:underline"
           >
@@ -193,7 +224,7 @@ export default function CampaignsSection({ pages }: Props) {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className={`grid gap-4 ${faturamentoBreakdown.some(r => r.range !== '(não informado)') ? 'grid-cols-2 xl:grid-cols-3' : 'grid-cols-2'}`}>
         <MetricCard
           label="Total de leads (período)"
           value={filtered.length.toLocaleString('pt-BR')}
@@ -208,6 +239,20 @@ export default function CampaignsSection({ pages }: Props) {
           color="text-emerald-600"
           icon={<TrendingUp size={18} />}
         />
+        {faturamentoBreakdown.some(r => r.range !== '(não informado)') && (
+          <div className="col-span-2 xl:col-span-1 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Leads por Faturamento</span>
+            <div className="flex flex-col gap-1.5">
+              {faturamentoBreakdown.map(({ range, count, pct }) => (
+                <div key={range} className="flex items-center gap-2">
+                  <span className="text-xs text-gray-600 flex-1 truncate">{range}</span>
+                  <span className="text-xs font-semibold text-gray-800 shrink-0">{count.toLocaleString('pt-BR')}</span>
+                  <span className="text-[11px] text-gray-400 shrink-0 w-10 text-right">{pct}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Timeline chart — only if date data exists */}

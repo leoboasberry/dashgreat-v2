@@ -196,7 +196,7 @@ export function isSmallRevenue(lead: ParsedLead): boolean {
   return false
 }
 
-/** Apply date, source/campaign, and page filters to a list of leads */
+/** Apply date, source/campaign, page, and faturamento filters to a list of leads */
 export function filterLeads(
   leads: ParsedLead[],
   opts: {
@@ -207,6 +207,7 @@ export function filterLeads(
     adSetCode?: string      // e.g. "F178C2"
     adCode?: string         // e.g. "F178C2AD2"
     pageName?: string
+    faturamento?: string    // normalized faturamento range, e.g. "Até R$ 30 mil"
   },
 ): ParsedLead[] {
   return leads.filter((l) => {
@@ -219,6 +220,7 @@ export function filterLeads(
     if (opts.adSetCode && l.adSet !== opts.adSetCode) return false
     if (opts.adCode && l.ad !== opts.adCode) return false
     if (opts.pageName && l.pageName !== opts.pageName) return false
+    if (opts.faturamento && normalizeFaturamento(l.faturamento) !== opts.faturamento) return false
     return true
   })
 }
@@ -320,8 +322,40 @@ export function allUniqueAds(leads: ParsedLead[], adSetCode?: string): string[] 
   return [...new Set(ads)].sort()
 }
 
+/** Normalize faturamento strings so variants like "Até 30 mil" and "Até R$ 30 mil" map to the same bucket */
+export function normalizeFaturamento(raw: string): string {
+  if (!raw.trim()) return ''
+  const s = raw.toLowerCase().replace(/\s+/g, ' ').trim()
+
+  // Extract primary numeric value (handles "30 mil", "30.000", "100000")
+  let valueK: number | null = null
+  const milM = s.match(/(\d+(?:[.,]\d+)?)\s*mil/)
+  if (milM) {
+    valueK = parseFloat(milM[1].replace(',', '.'))
+  } else {
+    const fullM = s.match(/(\d{1,3}(?:[.,]\d{3})+)/)
+    if (fullM) valueK = parseInt(fullM[1].replace(/[.,]/g, ''), 10) / 1000
+  }
+  if (valueK === null) return raw.trim()
+
+  const label = `R$ ${Number.isInteger(valueK) ? valueK : valueK.toFixed(1)} mil`
+  if (s.includes('até') || s.startsWith('ate')) return `Até ${label}`
+  if (s.includes('acima') || s.includes('mais de')) return `Acima de ${label}`
+  return `${label}`
+}
+
+/** Extract the numeric threshold (in thousands) from a normalized faturamento string for sorting */
+function faturamentoSortKey(s: string): number {
+  const m = s.match(/(\d+(?:[.,]\d+)?)\s*mil/)
+  if (!m) return Infinity
+  const n = parseFloat(m[1].replace(',', '.'))
+  // Put "Acima de" last within same value
+  return s.startsWith('Acima') ? n + 0.5 : n
+}
+
 export function allFaturamentoRanges(leads: ParsedLead[]): string[] {
-  return [...new Set(leads.map((l) => l.faturamento).filter(Boolean))].sort()
+  const normalized = leads.map((l) => normalizeFaturamento(l.faturamento)).filter(Boolean)
+  return [...new Set(normalized)].sort((a, b) => faturamentoSortKey(a) - faturamentoSortKey(b))
 }
 
 export function allUniquePages(leads: ParsedLead[]): { name: string; url: string }[] {
