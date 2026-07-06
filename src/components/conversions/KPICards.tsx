@@ -116,7 +116,7 @@ export default function KPICards({
   const cplComImposto = cpl !== null && funnel.mql > 0
     ? (totalSpend + metaTax) / funnel.mql
     : null
-  const metaCPMQL = metaMQLs > 0 && metaSpend > 0 ? metaSpend / metaMQLs : null
+  const metaCPMQL = metaMQLs > 0 && metaSpend > 0 ? (metaSpend + metaTax) / metaMQLs : null
   const googleCPMQL = googleMQLs > 0 && googleSpend > 0 ? googleSpend / googleMQLs : null
 
   return (
