@@ -169,27 +169,29 @@ export default function App() {
           </div>
         </div>
 
-        {/* Tab bar */}
-        {pages.length > 0 && (
-          <div className="px-4 sm:px-6 flex gap-1 border-t border-gray-100">
-            <TabButton active={activeTab === 'conversions'} onClick={() => setActiveTab('conversions')}>
-              Conversões
-            </TabButton>
-            <TabButton active={activeTab === 'leads'} onClick={() => setActiveTab('leads')}>
-              Leads do Dia
-            </TabButton>
-            <TabButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>
-              Visão Geral
-            </TabButton>
-            <TabButton
-              active={activeTab === 'campaigns'}
-              onClick={() => setActiveTab('campaigns')}
-              loading={loadingLeads}
-            >
-              Origem &amp; Campanhas
-            </TabButton>
-          </div>
-        )}
+        {/* Tab bar — Conversões always shown; GP-dependent tabs appear once pages load */}
+        <div className="px-4 sm:px-6 flex gap-1 border-t border-gray-100">
+          <TabButton active={activeTab === 'conversions'} onClick={() => setActiveTab('conversions')}>
+            Conversões
+          </TabButton>
+          {pages.length > 0 && (
+            <>
+              <TabButton active={activeTab === 'leads'} onClick={() => setActiveTab('leads')}>
+                Leads do Dia
+              </TabButton>
+              <TabButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>
+                Visão Geral
+              </TabButton>
+              <TabButton
+                active={activeTab === 'campaigns'}
+                onClick={() => setActiveTab('campaigns')}
+                loading={loadingLeads}
+              >
+                Origem &amp; Campanhas
+              </TabButton>
+            </>
+          )}
+        </div>
       </header>
 
       <main className="px-4 sm:px-6 py-6 flex flex-col gap-6">
@@ -201,13 +203,16 @@ export default function App() {
           </div>
         )}
 
-        {/* Global loading state */}
-        {loading && pages.length === 0 && (
+        {/* Global loading state — only show spinner when on a GP-dependent tab */}
+        {loading && pages.length === 0 && activeTab !== 'conversions' && (
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-400">
             <Loader2 size={32} className="animate-spin text-blue-400" />
             <span>Carregando dados das páginas...</span>
           </div>
         )}
+
+        {/* ── Conversões — always available, even if GreatPages is down ── */}
+        {activeTab === 'conversions' && <ConversionsSection pages={pages} />}
 
         {pages.length > 0 && (
           <>
@@ -255,9 +260,6 @@ export default function App() {
                 </div>
               </>
             )}
-
-            {/* ── Conversões ── */}
-            {activeTab === 'conversions' && <ConversionsSection pages={pages} />}
 
             {/* ── Leads do Dia ── */}
             {activeTab === 'leads' && <LeadsSection pages={pages} />}
