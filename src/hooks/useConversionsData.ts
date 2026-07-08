@@ -32,19 +32,26 @@ export function useConversionsData(
       invalidateSupabaseCache(dateFrom, dateTo)
     }
     setState((s) => ({ ...s, loading: true, error: null }))
-    try {
-      const [rawWindsorRows, rawEvents] = await Promise.all([
-        fetchWindsorData(dateFrom, dateTo).catch(() => [] as WindsorRow[]),
-        fetchEvents(dateFrom, dateTo).catch(() => [] as SupabaseEvent[]),
-      ])
-      setState({ loading: false, error: null, rawWindsorRows, rawEvents })
-    } catch (err) {
-      setState((s) => ({
-        ...s,
-        loading: false,
-        error: err instanceof Error ? err.message : 'Erro ao carregar dados',
-      }))
-    }
+
+    const warnings: string[] = []
+
+    const [rawWindsorRows, rawEvents] = await Promise.all([
+      fetchWindsorData(dateFrom, dateTo).catch((err: unknown) => {
+        warnings.push(`Windsor: ${err instanceof Error ? err.message : 'erro desconhecido'}`)
+        return [] as WindsorRow[]
+      }),
+      fetchEvents(dateFrom, dateTo).catch((err: unknown) => {
+        warnings.push(`Supabase: ${err instanceof Error ? err.message : 'erro desconhecido'}`)
+        return [] as SupabaseEvent[]
+      }),
+    ])
+
+    setState({
+      loading: false,
+      error: warnings.length > 0 ? warnings.join(' | ') : null,
+      rawWindsorRows,
+      rawEvents,
+    })
   }, [dateFrom, dateTo])
 
   // Debounce: wait 400ms after dates settle before fetching

@@ -5,6 +5,7 @@ function buildHeaders(token: string): HeadersInit {
   return {
     'X-GreatPages-Token': token,
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache',
   }
 }
 
@@ -27,6 +28,8 @@ async function fetchWithCache<T>(
   return data
 }
 
+const PAGES_PAGE_SIZE = 10
+
 export async function listPages(config: Config, forceRefresh = false): Promise<PagesListResponse> {
   const { token, id_usuario, id_projeto, cacheTtlMinutes } = config
   const cacheKey = `pages_${id_usuario}_${id_projeto}`
@@ -36,8 +39,41 @@ export async function listPages(config: Config, forceRefresh = false): Promise<P
     clearCacheByKey(cacheKey)
   }
 
-  const url = `/api/greatpages/paginas?id_usuario=${id_usuario}&id_projeto=${id_projeto}&pagina_quantidade=100`
-  return fetchWithCache<PagesListResponse>(cacheKey, url, buildHeaders(token), cacheTtlMinutes)
+  const cached = getCacheEntry<PagesListResponse>(cacheKey)
+  if (cached !== null) return cached
+
+  const headers = buildHeaders(token)
+  const baseUrl = `/api/greatpages/paginas?id_usuario=${id_usuario}&id_projeto=${id_projeto}&pagina_quantidade=${PAGES_PAGE_SIZE}`
+
+  const first = await fetch(`${baseUrl}&pagina=1`, { headers })
+  if (!first.ok) throw new Error(`API error ${first.status}`)
+  const firstData: PagesListResponse = await first.json()
+
+  const total = Number(firstData.retorno?.quantidade_total ?? firstData.retorno?.quantidade ?? 0)
+  let allPages = [...(firstData.retorno?.paginas ?? [])]
+
+  if (total > PAGES_PAGE_SIZE) {
+    const totalPages = Math.ceil(total / PAGES_PAGE_SIZE)
+    const rest = await Promise.allSettled(
+      Array.from({ length: totalPages - 1 }, (_, i) =>
+        fetch(`${baseUrl}&pagina=${i + 2}`, { headers })
+          .then((r) => (r.ok ? (r.json() as Promise<PagesListResponse>) : null)),
+      ),
+    )
+    for (const r of rest) {
+      if (r.status === 'fulfilled' && r.value) {
+        allPages = [...allPages, ...(r.value.retorno?.paginas ?? [])]
+      }
+    }
+  }
+
+  const merged: PagesListResponse = {
+    ...firstData,
+    retorno: { ...firstData.retorno, quantidade: allPages.length, paginas: allPages },
+  }
+
+  setCacheEntry(cacheKey, merged, cacheTtlMinutes)
+  return merged
 }
 
 export async function getPageReport(
