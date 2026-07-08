@@ -313,9 +313,9 @@ export default function KPICards({
 
         <div className="flex items-center w-full py-2">
           {stages.map((stage, i) => {
-            const maxValue = stages[0].value
+            const maxValue = Math.max(...stages.map((s) => s.value), 1)
             const ratio = maxValue > 0 ? Math.sqrt(stage.value / maxValue) : 0
-            const size = Math.round(52 + ratio * (136 - 52))
+            const size = Math.round(36 + ratio * (88 - 36))
             const fontSize = Math.max(12, Math.round(size * 0.22))
             const goal = stage.goalKey && goals ? (goals[stage.goalKey] as number) : 0
             return (
