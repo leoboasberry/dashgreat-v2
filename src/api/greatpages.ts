@@ -29,6 +29,28 @@ async function fetchWithCache<T>(
 }
 
 const PAGES_PAGE_SIZE = 10
+// Successful responses arrive in ~2-3s; broken ones hang for ~10s — abort at 4s
+const PAGE_FETCH_TIMEOUT_MS = 4000
+const PAGE_RETRY_DELAYS = [500]
+
+async function fetchPageRetry(url: string, headers: HeadersInit): Promise<PagesListResponse | null> {
+  for (let attempt = 0; attempt <= PAGE_RETRY_DELAYS.length; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, PAGE_RETRY_DELAYS[attempt - 1]))
+
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), PAGE_FETCH_TIMEOUT_MS)
+    try {
+      const res = await fetch(`${url}&_=${Date.now()}`, { headers, signal: controller.signal })
+      clearTimeout(timer)
+      if (!res.ok) continue
+      const data: PagesListResponse = await res.json()
+      if ((data.retorno?.paginas?.length ?? 0) > 0) return data
+    } catch {
+      clearTimeout(timer)
+    }
+  }
+  return null
+}
 
 export async function listPages(config: Config, forceRefresh = false): Promise<PagesListResponse> {
   const { token, id_usuario, id_projeto, cacheTtlMinutes } = config
@@ -45,24 +67,19 @@ export async function listPages(config: Config, forceRefresh = false): Promise<P
   const headers = buildHeaders(token)
   const baseUrl = `/api/greatpages/paginas?id_usuario=${id_usuario}&id_projeto=${id_projeto}&pagina_quantidade=${PAGES_PAGE_SIZE}`
 
-  const first = await fetch(`${baseUrl}&pagina=1`, { headers })
-  if (!first.ok) throw new Error(`API error ${first.status}`)
-  const firstData: PagesListResponse = await first.json()
+  const firstData = await fetchPageRetry(`${baseUrl}&pagina=1`, headers)
+  if (!firstData) throw new Error('GreatPages retornou 0 páginas após várias tentativas')
 
   const total = Number(firstData.retorno?.quantidade_total ?? firstData.retorno?.quantidade ?? 0)
   let allPages = [...(firstData.retorno?.paginas ?? [])]
 
   if (total > PAGES_PAGE_SIZE) {
     const totalPages = Math.ceil(total / PAGES_PAGE_SIZE)
-    const rest = await Promise.allSettled(
-      Array.from({ length: totalPages - 1 }, (_, i) =>
-        fetch(`${baseUrl}&pagina=${i + 2}`, { headers })
-          .then((r) => (r.ok ? (r.json() as Promise<PagesListResponse>) : null)),
-      ),
-    )
-    for (const r of rest) {
-      if (r.status === 'fulfilled' && r.value) {
-        allPages = [...allPages, ...(r.value.retorno?.paginas ?? [])]
+    // Fetch remaining pages sequentially to avoid triggering server-side rate limiting
+    for (let p = 2; p <= totalPages; p++) {
+      const pageData = await fetchPageRetry(`${baseUrl}&pagina=${p}`, headers)
+      if (pageData) {
+        allPages = [...allPages, ...(pageData.retorno?.paginas ?? [])]
       }
     }
   }

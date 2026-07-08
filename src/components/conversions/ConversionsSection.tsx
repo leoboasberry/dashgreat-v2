@@ -109,9 +109,6 @@ export default function ConversionsSection({ pages }: Props) {
     setSelRevenue(defaults)
   }, [rawEvents])
 
-  // Auto-initialize LP filter: pre-select pages with [ADS] prefix
-  const pagesInitializedRef = useRef(false)
-
   // Build page name map from GreatPages data
   const pageNameMap = useMemo(
     () => new Map(pages.map((p) => [p.summary.id, p.summary.titulo])),
@@ -134,14 +131,6 @@ export default function ConversionsSection({ pages }: Props) {
     [filterOptions.pages, pageNameMap],
   )
 
-  useEffect(() => {
-    if (pagesInitializedRef.current || pageOptions.length === 0) return
-    const adsPages = pageOptions.filter((p) => p.label.startsWith('[ADS]')).map((p) => p.id)
-    if (adsPages.length > 0) {
-      pagesInitializedRef.current = true
-      setSelPages(adsPages)
-    }
-  }, [pageOptions])
 
   // Compute all metrics from raw data + current filters
   const metrics = useMemo(
