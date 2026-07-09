@@ -1,5 +1,6 @@
 import type { Config, PagesListResponse, PageReportResponse, LeadsResponse } from '../types/greatpages'
 import { getCacheEntry, setCacheEntry } from './cache'
+import { getSupabaseCacheEntry, setSupabaseCacheEntry } from './supabaseCache'
 
 function buildHeaders(token: string): HeadersInit {
   return {
@@ -7,25 +8,6 @@ function buildHeaders(token: string): HeadersInit {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache',
   }
-}
-
-async function fetchWithCache<T>(
-  cacheKey: string,
-  url: string,
-  headers: HeadersInit,
-  ttlMinutes: number,
-): Promise<T> {
-  const cached = getCacheEntry<T>(cacheKey)
-  if (cached !== null) return cached
-
-  const res = await fetch(url, { headers })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`API error ${res.status}: ${text}`)
-  }
-  const data: T = await res.json()
-  setCacheEntry(cacheKey, data, ttlMinutes)
-  return data
 }
 
 const PAGES_PAGE_SIZE = 10
@@ -55,15 +37,30 @@ async function fetchPageRetry(url: string, headers: HeadersInit): Promise<PagesL
 export async function listPages(config: Config, forceRefresh = false): Promise<PagesListResponse> {
   const { token, id_usuario, id_projeto, cacheTtlMinutes } = config
   const cacheKey = `pages_${id_usuario}_${id_projeto}`
+  const sbSource = 'gp_pages'
+  const ttlSeconds = cacheTtlMinutes * 60
 
   if (forceRefresh) {
     const { clearCacheByKey } = await import('./cache')
     clearCacheByKey(cacheKey)
   }
 
-  const cached = getCacheEntry<PagesListResponse>(cacheKey)
-  if (cached !== null) return cached
+  // 1. localStorage
+  if (!forceRefresh) {
+    const cached = getCacheEntry<PagesListResponse>(cacheKey)
+    if (cached !== null) return cached
+  }
 
+  // 2. Supabase cache (shared, survives browser refresh)
+  if (!forceRefresh) {
+    const sbData = await getSupabaseCacheEntry<PagesListResponse>(sbSource, cacheKey)
+    if (sbData !== null) {
+      setCacheEntry(cacheKey, sbData, cacheTtlMinutes)
+      return sbData
+    }
+  }
+
+  // 3. GreatPages API
   const headers = buildHeaders(token)
   const baseUrl = `/api/greatpages/paginas?id_usuario=${id_usuario}&id_projeto=${id_projeto}&pagina_quantidade=${PAGES_PAGE_SIZE}`
 
@@ -75,7 +72,7 @@ export async function listPages(config: Config, forceRefresh = false): Promise<P
 
   if (total > PAGES_PAGE_SIZE) {
     const totalPages = Math.ceil(total / PAGES_PAGE_SIZE)
-    // Fetch remaining pages sequentially to avoid triggering server-side rate limiting
+    // Sequential to avoid triggering server-side rate limiting
     for (let p = 2; p <= totalPages; p++) {
       const pageData = await fetchPageRetry(`${baseUrl}&pagina=${p}`, headers)
       if (pageData) {
@@ -90,6 +87,7 @@ export async function listPages(config: Config, forceRefresh = false): Promise<P
   }
 
   setCacheEntry(cacheKey, merged, cacheTtlMinutes)
+  setSupabaseCacheEntry(sbSource, cacheKey, merged, ttlSeconds)
   return merged
 }
 
@@ -100,14 +98,41 @@ export async function getPageReport(
 ): Promise<PageReportResponse> {
   const { token, id_usuario, id_projeto, cacheTtlMinutes } = config
   const cacheKey = `report_${id_usuario}_${id_projeto}_${pageId}`
+  const sbSource = 'gp_report'
+  const ttlSeconds = cacheTtlMinutes * 60
 
   if (forceRefresh) {
     const { clearCacheByKey } = await import('./cache')
     clearCacheByKey(cacheKey)
   }
 
+  // 1. localStorage
+  if (!forceRefresh) {
+    const cached = getCacheEntry<PageReportResponse>(cacheKey)
+    if (cached !== null) return cached
+  }
+
+  // 2. Supabase cache
+  if (!forceRefresh) {
+    const sbData = await getSupabaseCacheEntry<PageReportResponse>(sbSource, cacheKey)
+    if (sbData !== null) {
+      setCacheEntry(cacheKey, sbData, cacheTtlMinutes)
+      return sbData
+    }
+  }
+
+  // 3. GreatPages API
   const url = `/api/greatpages/paginas/${pageId}/relatorios?id_usuario=${id_usuario}&id_projeto=${id_projeto}`
-  return fetchWithCache<PageReportResponse>(cacheKey, url, buildHeaders(token), cacheTtlMinutes)
+  const res = await fetch(url, { headers: buildHeaders(token) })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`API error ${res.status}: ${text}`)
+  }
+  const data: PageReportResponse = await res.json()
+
+  setCacheEntry(cacheKey, data, cacheTtlMinutes)
+  setSupabaseCacheEntry(sbSource, cacheKey, data, ttlSeconds)
+  return data
 }
 
 const LEADS_PAGE_SIZE = 200
@@ -120,19 +145,33 @@ export async function getPageLeads(
 ): Promise<LeadsResponse> {
   const { token, id_usuario, id_projeto, cacheTtlMinutes } = config
   const cacheKey = `leads_${id_usuario}_${id_projeto}_${pageId}`
+  const sbSource = 'gp_leads'
+  const ttlSeconds = cacheTtlMinutes * 60
 
   if (forceRefresh) {
     const { clearCacheByKey } = await import('./cache')
     clearCacheByKey(cacheKey)
   }
 
-  const cached = getCacheEntry<LeadsResponse>(cacheKey)
-  if (cached !== null) return cached
+  // 1. localStorage
+  if (!forceRefresh) {
+    const cached = getCacheEntry<LeadsResponse>(cacheKey)
+    if (cached !== null) return cached
+  }
 
+  // 2. Supabase cache
+  if (!forceRefresh) {
+    const sbData = await getSupabaseCacheEntry<LeadsResponse>(sbSource, cacheKey)
+    if (sbData !== null) {
+      setCacheEntry(cacheKey, sbData, cacheTtlMinutes)
+      return sbData
+    }
+  }
+
+  // 3. GreatPages API
   const headers = buildHeaders(token)
   const baseUrl = `/api/greatpages/paginas/${pageId}/leads?id_usuario=${id_usuario}&id_projeto=${id_projeto}&pagina_ordenacao=DESC&pagina_quantidade=${LEADS_PAGE_SIZE}`
 
-  // Fetch first page
   const firstRes = await fetch(`${baseUrl}&pagina=1`, { headers })
   if (!firstRes.ok) throw new Error(`API error ${firstRes.status}`)
   const first: LeadsResponse = await firstRes.json()
@@ -142,7 +181,6 @@ export async function getPageLeads(
 
   if (total > LEADS_PAGE_SIZE && allLeads.length < LEADS_MAX_CAP) {
     const totalPages = Math.ceil(Math.min(total, LEADS_MAX_CAP) / LEADS_PAGE_SIZE)
-    // Fetch remaining pages in parallel
     const rest = await Promise.allSettled(
       Array.from({ length: totalPages - 1 }, (_, i) =>
         fetch(`${baseUrl}&pagina=${i + 2}`, { headers })
@@ -166,5 +204,6 @@ export async function getPageLeads(
   }
 
   setCacheEntry(cacheKey, merged, cacheTtlMinutes)
+  setSupabaseCacheEntry(sbSource, cacheKey, merged, ttlSeconds)
   return merged
 }

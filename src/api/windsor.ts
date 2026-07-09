@@ -1,4 +1,5 @@
 import { getCacheEntry, setCacheEntry } from './cache'
+import { getSupabaseCacheEntry, setSupabaseCacheEntry } from './supabaseCache'
 
 export interface WindsorRow {
   date: string
@@ -80,7 +81,15 @@ export async function fetchWindsorData(dateFrom: string, dateTo: string): Promis
     return stored
   }
 
-  // 3. Network fetch
+  // 3. Supabase cache hit (shared across browsers, survives page refresh)
+  const sbData = await getSupabaseCacheEntry<WindsorRow[]>('windsor', cacheKey)
+  if (sbData) {
+    setCacheEntry(cacheKey, sbData, CACHE_TTL_MINUTES)
+    memCache.set(cacheKey, sbData)
+    return sbData
+  }
+
+  // 4. Network fetch
   const params = new URLSearchParams({
     api_key: apiKey,
     date_from: dateFrom,
@@ -99,6 +108,7 @@ export async function fetchWindsorData(dateFrom: string, dateTo: string): Promis
 
   setCacheEntry(cacheKey, rows, CACHE_TTL_MINUTES)
   memCache.set(cacheKey, rows)
+  setSupabaseCacheEntry('windsor', cacheKey, rows, CACHE_TTL_MINUTES * 60)
   return rows
 }
 
