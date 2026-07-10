@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { currentMonthBRT, getDatePresets } from '../../utils/dateBRT'
-import { Users, TrendingUp } from 'lucide-react'
+import { Users, TrendingUp, Download } from 'lucide-react'
 import type { PageData } from '../../hooks/useDashboard'
 import {
   parseAllLeads,
@@ -13,6 +13,7 @@ import {
   allUniquePages,
   allFaturamentoRanges,
   normalizeFaturamento,
+  type ParsedLead,
 } from '../../utils/parseLeads'
 import MetricCard from '../MetricCard'
 import LeadsTimelineChart from './LeadsTimelineChart'
@@ -22,6 +23,61 @@ import PositioningTable from './PositioningTable'
 import LeadsHeatmapChart from './LeadsHeatmapChart'
 
 const SELECT_CLS = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0D2F9F]'
+
+function escapeCSV(v: string): string {
+  if (v == null) return ''
+  const s = String(v)
+  if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
+    return `"${s.replace(/"/g, '""')}"`
+  }
+  return s
+}
+
+function exportLeadsCSV(leads: ParsedLead[], filename: string) {
+  if (leads.length === 0) return
+
+  // Collect all raw field names in order of first appearance
+  const rawColsSet = new Set<string>()
+  for (const l of leads) {
+    for (const k of Object.keys(l.raw)) rawColsSet.add(k)
+  }
+  const rawCols = [...rawColsSet]
+
+  const structuredHeaders = [
+    'Data', 'Hora', 'Origem', 'Mídia', 'Campanha (código)', 'Campanha', 'Conjunto', 'Anúncio',
+    'Faturamento', 'Segmento', 'Página', 'URL',
+  ]
+  const headers = [...structuredHeaders, ...rawCols]
+
+  const rows = leads.map((l) => {
+    const structured = [
+      l.date,
+      l.hour >= 0 ? String(l.hour).padStart(2, '0') + 'h' : '',
+      l.utmSource,
+      l.utmMedium,
+      l.utmCampaign,
+      l.campaign,
+      l.adSet,
+      l.ad,
+      l.faturamento,
+      l.segmento,
+      l.pageName,
+      l.pageUrl,
+    ]
+    const raw = rawCols.map((k) => l.raw[k] ?? '')
+    return [...structured, ...raw].map(escapeCSV).join(',')
+  })
+
+  const bom = '﻿' // UTF-8 BOM for Excel compatibility
+  const csv = bom + [headers.map(escapeCSV).join(','), ...rows].join('\r\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 interface Props {
   pages: PageData[]
@@ -107,7 +163,20 @@ export default function CampaignsSection({ pages }: Props) {
     <div className="flex flex-col gap-6">
       {/* Filters */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Filtros</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Filtros</h3>
+          <button
+            onClick={() => {
+              const date = new Date().toISOString().slice(0, 10)
+              exportLeadsCSV(filtered, `leads_${date}.csv`)
+            }}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-[#0D2F9F] text-[#0D2F9F] hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Download size={13} />
+            Exportar CSV ({filtered.length})
+          </button>
+        </div>
         <div className="mb-3 flex flex-wrap gap-1.5">
           {getDatePresets().map(({ label, from, to }) => (
             <button
