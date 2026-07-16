@@ -102,6 +102,7 @@ export interface CrmRow {
   eventId: string
   // For duplicate check
   existsInSupabase: boolean
+  dupeReason: 'deal_id' | 'email+utm' | null
 }
 
 export function buildEventPayload(row: CrmRow) {
@@ -224,6 +225,7 @@ export function parseCrmCsvText(
       enriched: false,
       eventId,
       existsInSupabase: false,
+      dupeReason: null,
     })
   }
 

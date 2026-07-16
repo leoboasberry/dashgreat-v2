@@ -18,34 +18,46 @@ function baseHeaders(key: string) {
 
 const PAGE_SIZE = 1000
 
+export interface ExistingIndex {
+  byDealId: Set<string>
+  byEmailCampaign: Set<string> // "email|utm_campaign" — only when both non-null
+}
+
 /**
- * Fetches all deal_ids that already have an event of `eventType` within
- * the date range covered by `rows`. Uses a date-range query (same pattern as
- * fetchEvents) to avoid PostgREST in.() syntax issues with long ID lists.
+ * Fetches existing events of `eventType` within the date range of `rows`
+ * and builds two deduplication indexes:
+ *   - byDealId: deal_ids already in Supabase
+ *   - byEmailCampaign: "email|utm_campaign" combos (additional safety net)
  *
- * Returns { existing, error } — error is a human-readable string when the
- * query fails so the UI can surface it instead of silently returning nothing.
+ * A CSV row is a duplicate when either index matches.
+ * Returns { index, error } — error is surfaced to the UI, never silently swallowed.
  */
-export async function fetchExistingDealIds(
+export async function fetchExistingIndex(
   rows: CrmRow[],
   eventType: string,
-): Promise<{ existing: Set<string>; error: string | null }> {
+): Promise<{ index: ExistingIndex; error: string | null }> {
   const sb = getSupabaseBase()
-  if (!sb) return { existing: new Set(), error: null }
+  const empty: ExistingIndex = { byDealId: new Set(), byEmailCampaign: new Set() }
+  if (!sb) return { index: empty, error: null }
 
   const dates = rows.map((r) => r.eventDate).filter(Boolean).sort()
-  if (dates.length === 0) return { existing: new Set(), error: null }
+  if (dates.length === 0) return { index: empty, error: null }
 
-  // Cover the full date range from the CSV rows (±0 days — dates are exact)
   const dateFrom = dates[0]
   const dateTo = dates[dates.length - 1]
 
-  const existing = new Set<string>()
+  const index: ExistingIndex = { byDealId: new Set(), byEmailCampaign: new Set() }
   const base = `${sb.url}/rest/v1/events`
-  const qs = `select=deal_id&event_type=eq.${eventType}&event_date=gte.${dateFrom}&event_date=lte.${dateTo}`
+  const qs = `select=deal_id,email_norm,utm_campaign&event_type=eq.${eventType}&event_date=gte.${dateFrom}&event_date=lte.${dateTo}`
+
+  function addToIndex(row: { deal_id: string; email_norm: string | null; utm_campaign: string | null }) {
+    index.byDealId.add(row.deal_id)
+    if (row.email_norm && row.utm_campaign) {
+      index.byEmailCampaign.add(`${row.email_norm}|${row.utm_campaign}`)
+    }
+  }
 
   try {
-    // First page
     const first = await fetch(`${base}?${qs}`, {
       headers: {
         ...baseHeaders(sb.key),
@@ -57,16 +69,13 @@ export async function fetchExistingDealIds(
 
     if (!first.ok) {
       const text = await first.text()
-      return {
-        existing,
-        error: `Supabase retornou HTTP ${first.status}: ${text.slice(0, 300)}`,
-      }
+      return { index, error: `Supabase retornou HTTP ${first.status}: ${text.slice(0, 300)}` }
     }
 
-    const firstData: Array<{ deal_id: string }> = await first.json()
-    for (const { deal_id } of firstData) existing.add(deal_id)
+    const firstData: Array<{ deal_id: string; email_norm: string | null; utm_campaign: string | null }> =
+      await first.json()
+    firstData.forEach(addToIndex)
 
-    // Paginate if more rows exist
     const contentRange = first.headers.get('content-range') ?? ''
     const total = Number(contentRange.split('/')[1]) || firstData.length
     let fetched = firstData.length
@@ -83,15 +92,16 @@ export async function fetchExistingDealIds(
         },
       })
       if (!next.ok) break
-      const nextData: Array<{ deal_id: string }> = await next.json()
-      for (const { deal_id } of nextData) existing.add(deal_id)
+      const nextData: Array<{ deal_id: string; email_norm: string | null; utm_campaign: string | null }> =
+        await next.json()
+      nextData.forEach(addToIndex)
       fetched += nextData.length
       if (nextData.length === 0) break
     }
 
-    return { existing, error: null }
+    return { index, error: null }
   } catch (e) {
-    return { existing, error: String(e) }
+    return { index, error: String(e) }
   }
 }
 

@@ -3,7 +3,7 @@ import { Upload, CheckCircle2, XCircle, AlertCircle, Loader2, Search, Database }
 import type { PageData } from '../../hooks/useDashboard'
 import type { CrmRow, CrmEventType } from '../../utils/parseCrmCsv'
 import { parseCrmCsvText, EVENT_TYPE_LABELS } from '../../utils/parseCrmCsv'
-import { fetchExistingDealIds, upsertCrmRows } from '../../api/supabaseInsert'
+import { fetchExistingIndex, upsertCrmRows } from '../../api/supabaseInsert'
 
 interface Props {
   pages: PageData[]
@@ -115,13 +115,22 @@ export default function BackfillSection({ pages }: Props) {
   async function handleCheck() {
     setStep('checking')
     setCheckError(null)
-    const { existing, error } = await fetchExistingDealIds(rows, eventType)
+    const { index, error } = await fetchExistingIndex(rows, eventType)
     if (error) {
       setCheckError(error)
       setStep('preview')
       return
     }
-    const updated = rows.map((r) => ({ ...r, existsInSupabase: existing.has(r.dealId) }))
+    const updated = rows.map((r) => {
+      const byDeal = index.byDealId.has(r.dealId)
+      const emailCampaignKey = r.emailNorm && r.utmCampaign ? `${r.emailNorm}|${r.utmCampaign}` : null
+      const byEmailCampaign = !!emailCampaignKey && index.byEmailCampaign.has(emailCampaignKey)
+      return {
+        ...r,
+        existsInSupabase: byDeal || byEmailCampaign,
+        dupeReason: byDeal ? 'deal_id' as const : byEmailCampaign ? 'email+utm' as const : null,
+      }
+    })
     setRows(updated)
     setStep('ready')
   }
@@ -416,11 +425,16 @@ function StatChip({
 }
 
 function RowStatus({ row, step }: { row: CrmRow; step: Step }) {
+  const dupeLabel =
+    row.dupeReason === 'deal_id' ? 'deal_id' :
+    row.dupeReason === 'email+utm' ? 'email+utm' : null
+
   if (step === 'done') {
     if (row.existsInSupabase) {
       return (
-        <span className="flex items-center gap-1 text-amber-600">
+        <span className="flex items-center gap-1 text-amber-600" title={`Duplicata por ${dupeLabel}`}>
           <AlertCircle size={11} /> Já existe
+          {dupeLabel && <span className="text-[10px] opacity-70">({dupeLabel})</span>}
         </span>
       )
     }
@@ -433,8 +447,9 @@ function RowStatus({ row, step }: { row: CrmRow; step: Step }) {
   if (step === 'ready' || step === 'checking') {
     if (row.existsInSupabase) {
       return (
-        <span className="flex items-center gap-1 text-amber-600">
+        <span className="flex items-center gap-1 text-amber-600" title={`Duplicata por ${dupeLabel}`}>
           <AlertCircle size={11} /> Já existe
+          {dupeLabel && <span className="text-[10px] opacity-70">({dupeLabel})</span>}
         </span>
       )
     }
