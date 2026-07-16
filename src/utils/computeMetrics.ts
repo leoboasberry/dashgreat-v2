@@ -139,7 +139,8 @@ function evtSegment(ev: SupabaseEvent): string {
 }
 
 function evtCodes(ev: SupabaseEvent) {
-  const utmCampaign = ev.payload?.deal?.utmCampaign ?? ''
+  const raw = ev.payload?.deal?.utmCampaign
+  const utmCampaign = typeof raw === 'string' ? raw : ''
   return parseCampaign(utmCampaign)
 }
 

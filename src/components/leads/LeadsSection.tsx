@@ -120,8 +120,9 @@ export default function LeadsSection({ pages }: Props) {
     () =>
       excludedCodes.length > 0
         ? rawEvents.filter((ev) => {
-            const utmCampaign = (ev.payload as Record<string, unknown> & { deal?: Record<string, unknown> })?.deal?.utmCampaign ?? ''
-            const m = (utmCampaign as string).match(/\b([A-Za-z]+\d+)\b/)
+            const rawCampaign = (ev.payload as Record<string, unknown> & { deal?: Record<string, unknown> })?.deal?.utmCampaign
+            const utmCampaign = typeof rawCampaign === 'string' ? rawCampaign : ''
+            const m = utmCampaign.match(/\b([A-Za-z]+\d+)\b/)
             const code = m ? m[1]! : ''
             return !code || !excludedCodes.includes(code)
           })

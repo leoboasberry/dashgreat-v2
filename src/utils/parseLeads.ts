@@ -21,7 +21,8 @@ export interface ParsedLead {
 }
 
 /** Parse utmCampaign into structured campaign/adSet/ad */
-export function parseCampaign(utmCampaign: string): { campaign: string; adSet: string; ad: string } {
+export function parseCampaign(utmCampaign: unknown): { campaign: string; adSet: string; ad: string } {
+  if (typeof utmCampaign !== 'string') return { campaign: '', adSet: '', ad: '' }
   const m = utmCampaign.match(/^([A-Za-z]+\d+)(C\d+)(AD\d+)?/i)
   if (!m) return { campaign: utmCampaign, adSet: utmCampaign, ad: utmCampaign }
   const campaign = m[1]!
