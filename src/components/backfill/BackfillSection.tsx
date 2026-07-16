@@ -73,6 +73,7 @@ export default function BackfillSection({ pages }: Props) {
   const [progress, setProgress] = useState(0)
   const [progressTotal, setProgressTotal] = useState(0)
   const [importResult, setImportResult] = useState<{ ok: number; err: number; errors: string[] } | null>(null)
+  const [checkError, setCheckError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -113,8 +114,13 @@ export default function BackfillSection({ pages }: Props) {
 
   async function handleCheck() {
     setStep('checking')
-    const dealIds = [...new Set(rows.map((r) => r.dealId))]
-    const existing = await fetchExistingDealIds(dealIds, eventType)
+    setCheckError(null)
+    const { existing, error } = await fetchExistingDealIds(rows, eventType)
+    if (error) {
+      setCheckError(error)
+      setStep('preview')
+      return
+    }
     const updated = rows.map((r) => ({ ...r, existsInSupabase: existing.has(r.dealId) }))
     setRows(updated)
     setStep('ready')
@@ -138,6 +144,7 @@ export default function BackfillSection({ pages }: Props) {
     setStep('upload')
     setImportResult(null)
     setProgress(0)
+    setCheckError(null)
   }
 
   const newRows = rows.filter((r) => !r.existsInSupabase)
@@ -283,6 +290,17 @@ export default function BackfillSection({ pages }: Props) {
               )}
             </div>
           </div>
+
+          {/* Check error */}
+          {checkError && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+              <XCircle size={15} className="shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium">Erro ao verificar Supabase</p>
+                <p className="text-xs mt-0.5 font-mono">{checkError}</p>
+              </div>
+            </div>
+          )}
 
           {/* Import progress */}
           {step === 'importing' && progressTotal > 0 && (

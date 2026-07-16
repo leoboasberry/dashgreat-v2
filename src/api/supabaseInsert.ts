@@ -16,38 +16,83 @@ function baseHeaders(key: string) {
   }
 }
 
+const PAGE_SIZE = 1000
+
 /**
- * Returns the set of deal_ids that already have an event of `eventType`
- * in Supabase. Batches requests to keep URLs short.
+ * Fetches all deal_ids that already have an event of `eventType` within
+ * the date range covered by `rows`. Uses a date-range query (same pattern as
+ * fetchEvents) to avoid PostgREST in.() syntax issues with long ID lists.
+ *
+ * Returns { existing, error } — error is a human-readable string when the
+ * query fails so the UI can surface it instead of silently returning nothing.
  */
 export async function fetchExistingDealIds(
-  dealIds: string[],
+  rows: CrmRow[],
   eventType: string,
-): Promise<Set<string>> {
+): Promise<{ existing: Set<string>; error: string | null }> {
   const sb = getSupabaseBase()
-  if (!sb || dealIds.length === 0) return new Set()
+  if (!sb) return { existing: new Set(), error: null }
+
+  const dates = rows.map((r) => r.eventDate).filter(Boolean).sort()
+  if (dates.length === 0) return { existing: new Set(), error: null }
+
+  // Cover the full date range from the CSV rows (±0 days — dates are exact)
+  const dateFrom = dates[0]
+  const dateTo = dates[dates.length - 1]
 
   const existing = new Set<string>()
-  const CHUNK = 50
+  const base = `${sb.url}/rest/v1/events`
+  const qs = `select=deal_id&event_type=eq.${eventType}&event_date=gte.${dateFrom}&event_date=lte.${dateTo}`
 
-  for (let i = 0; i < dealIds.length; i += CHUNK) {
-    const chunk = dealIds.slice(i, i + CHUNK)
-    const inClause = chunk.map((id) => `"${id}"`).join(',')
-    try {
-      const res = await fetch(
-        `${sb.url}/rest/v1/events?select=deal_id&event_type=eq.${eventType}&deal_id=in.(${inClause})`,
-        { headers: baseHeaders(sb.key) },
-      )
-      if (res.ok) {
-        const data: Array<{ deal_id: string }> = await res.json()
-        for (const { deal_id } of data) existing.add(deal_id)
+  try {
+    // First page
+    const first = await fetch(`${base}?${qs}`, {
+      headers: {
+        ...baseHeaders(sb.key),
+        Range: `0-${PAGE_SIZE - 1}`,
+        'Range-Unit': 'items',
+        Prefer: 'count=exact',
+      },
+    })
+
+    if (!first.ok) {
+      const text = await first.text()
+      return {
+        existing,
+        error: `Supabase retornou HTTP ${first.status}: ${text.slice(0, 300)}`,
       }
-    } catch {
-      // Network error on one chunk — continue
     }
-  }
 
-  return existing
+    const firstData: Array<{ deal_id: string }> = await first.json()
+    for (const { deal_id } of firstData) existing.add(deal_id)
+
+    // Paginate if more rows exist
+    const contentRange = first.headers.get('content-range') ?? ''
+    const total = Number(contentRange.split('/')[1]) || firstData.length
+    let fetched = firstData.length
+
+    while (fetched < total) {
+      const from = fetched
+      const to = from + PAGE_SIZE - 1
+      const next = await fetch(`${base}?${qs}`, {
+        headers: {
+          ...baseHeaders(sb.key),
+          Range: `${from}-${to}`,
+          'Range-Unit': 'items',
+          Prefer: 'count=none',
+        },
+      })
+      if (!next.ok) break
+      const nextData: Array<{ deal_id: string }> = await next.json()
+      for (const { deal_id } of nextData) existing.add(deal_id)
+      fetched += nextData.length
+      if (nextData.length === 0) break
+    }
+
+    return { existing, error: null }
+  } catch (e) {
+    return { existing, error: String(e) }
+  }
 }
 
 export interface InsertResult {
@@ -57,8 +102,8 @@ export interface InsertResult {
 }
 
 /**
- * Upserts a batch of CrmRows as Supabase events.
- * Skips rows already marked existsInSupabase.
+ * Upserts CrmRows as Supabase events.
+ * Rows marked existsInSupabase are skipped.
  * Uses ignore-duplicates so re-runs are always safe.
  */
 export async function upsertCrmRows(
