@@ -10,6 +10,7 @@ import SummaryChart from './components/SummaryChart'
 import CampaignsSection from './components/campaigns/CampaignsSection'
 import ConversionsSection from './components/conversions/ConversionsSection'
 import LeadsSection from './components/leads/LeadsSection'
+import BackfillSection from './components/backfill/BackfillSection'
 import { clearAllCache } from './api/cache'
 
 const STORAGE_KEY = 'gp_config'
@@ -30,7 +31,7 @@ const ENV_CONFIG: Config | null =
 // Password stored as plain text env var (VITE_GP_PASSWORD) or as SHA-256 hash in localStorage
 const ENV_PASSWORD: string = (import.meta.env.VITE_GP_PASSWORD as string) ?? ''
 
-type Tab = 'overview' | 'campaigns' | 'conversions' | 'leads'
+type Tab = 'overview' | 'campaigns' | 'conversions' | 'leads' | 'backfill'
 
 function loadConfig(): Config | null {
   try {
@@ -191,6 +192,9 @@ export default function App() {
               </TabButton>
             </>
           )}
+          <TabButton active={activeTab === 'backfill'} onClick={() => setActiveTab('backfill')}>
+            Backfill CRM
+          </TabButton>
         </div>
       </header>
 
@@ -213,6 +217,9 @@ export default function App() {
 
         {/* ── Conversões — always available, even if GreatPages is down ── */}
         {activeTab === 'conversions' && <ConversionsSection pages={pages} />}
+
+        {/* ── Backfill CRM — always available ── */}
+        {activeTab === 'backfill' && <BackfillSection pages={pages} />}
 
         {pages.length > 0 && (
           <>
