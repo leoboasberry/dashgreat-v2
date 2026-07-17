@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { RefreshCw, Loader2, AlertCircle, Search, ChevronUp, ChevronDown } from 'lucide-react'
 import { useConversionsData } from '../../hooks/useConversionsData'
 import { useExcludedCampaigns } from '../../hooks/useExcludedCampaigns'
+import { useExcludedUtms } from '../../hooks/useExcludedUtms'
 import { parseDealLeads, computeLeadCounts, STAGE_LABELS, STAGE_ORDER, fmtEventDateTime } from '../../utils/parseLeadDetail'
 import type { LeadSummary } from '../../utils/parseLeadDetail'
 import { extractFilterOptions } from '../../utils/computeMetrics'
@@ -10,6 +11,7 @@ import { normalizeCrmChannel } from '../../utils/channelNorm'
 import type { PageData } from '../../hooks/useDashboard'
 import MultiSelect from '../conversions/MultiSelect'
 import ExcludedCampaignsFilter from '../conversions/ExcludedCampaignsFilter'
+import ExcludedUtmsFilter from '../conversions/ExcludedUtmsFilter'
 import LeadModal from './LeadModal'
 import { todayBRT, getDatePresets } from '../../utils/dateBRT'
 
@@ -102,6 +104,7 @@ export default function LeadsSection({ pages }: Props) {
   const [selectedLead, setSelectedLead] = useState<LeadSummary | null>(null)
 
   const { excluded: excludedCampaigns, updateExcluded: setExcludedCampaigns } = useExcludedCampaigns()
+  const { excluded: excludedUtms, updateExcluded: setExcludedUtms } = useExcludedUtms()
 
   const { loading, error, rawWindsorRows, rawEvents, reload } = useConversionsData(dateFrom, dateTo)
 
@@ -115,20 +118,27 @@ export default function LeadsSection({ pages }: Props) {
     return [...codes]
   }, [excludedCampaigns])
 
-  // Filter events by excluded campaigns
-  const filteredEvents = useMemo(
-    () =>
-      excludedCodes.length > 0
-        ? rawEvents.filter((ev) => {
-            const rawCampaign = (ev.payload as Record<string, unknown> & { deal?: Record<string, unknown> })?.deal?.utmCampaign
-            const utmCampaign = typeof rawCampaign === 'string' ? rawCampaign : ''
-            const m = utmCampaign.match(/\b([A-Za-z]+\d+)\b/)
-            const code = m ? m[1]! : ''
-            return !code || !excludedCodes.includes(code)
-          })
-        : rawEvents,
-    [rawEvents, excludedCodes],
-  )
+  // Filter events by excluded campaigns + excluded UTMs
+  const filteredEvents = useMemo(() => {
+    let events = rawEvents
+    if (excludedCodes.length > 0) {
+      events = events.filter((ev) => {
+        const rawCampaign = (ev.payload as Record<string, unknown> & { deal?: Record<string, unknown> })?.deal?.utmCampaign
+        const utmCampaign = typeof rawCampaign === 'string' ? rawCampaign : ''
+        const m = utmCampaign.match(/\b([A-Za-z]+\d+)\b/)
+        const code = m ? m[1]! : ''
+        return !code || !excludedCodes.includes(code)
+      })
+    }
+    if (excludedUtms.length > 0) {
+      events = events.filter((ev) => {
+        const raw = ev.payload?.deal?.utmCampaign
+        const utmCampaign = typeof raw === 'string' ? raw.trim() : ''
+        return !utmCampaign || !excludedUtms.includes(utmCampaign)
+      })
+    }
+    return events
+  }, [rawEvents, excludedCodes, excludedUtms])
 
   // All Windsor campaigns for exclusion filter
   const allWindsorCampaigns = useMemo(() => {
@@ -138,6 +148,16 @@ export default function LeadsSection({ pages }: Props) {
     }
     return [...names].sort()
   }, [rawWindsorRows])
+
+  // All unique UTM campaign values from Supabase events
+  const allUtmCampaigns = useMemo(() => {
+    const values = new Set<string>()
+    for (const ev of rawEvents) {
+      const raw = ev.payload?.deal?.utmCampaign
+      if (typeof raw === 'string' && raw.trim()) values.add(raw.trim())
+    }
+    return [...values].sort()
+  }, [rawEvents])
 
   // Parse leads from Supabase events — only deals that ENTERED the funnel in this date range
   const allLeads = useMemo(() => {
@@ -384,6 +404,11 @@ export default function LeadsSection({ pages }: Props) {
             allCampaigns={allWindsorCampaigns}
             excluded={excludedCampaigns}
             onChange={setExcludedCampaigns}
+          />
+          <ExcludedUtmsFilter
+            allUtms={allUtmCampaigns}
+            excluded={excludedUtms}
+            onChange={setExcludedUtms}
           />
         </div>
       </div>

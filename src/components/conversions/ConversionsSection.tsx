@@ -7,6 +7,7 @@ import { computeMetrics, extractFilterOptions } from '../../utils/computeMetrics
 import type { PageData } from '../../hooks/useDashboard'
 import { useCeaConfig } from '../../hooks/useCeaConfig'
 import { useExcludedCampaigns } from '../../hooks/useExcludedCampaigns'
+import { useExcludedUtms } from '../../hooks/useExcludedUtms'
 import { useGoalsConfig } from '../../hooks/useGoalsConfig'
 import GoalsDrawer from './GoalsDrawer'
 import KPICards from './KPICards'
@@ -19,19 +20,16 @@ import PacingSection from './PacingSection'
 import QualityMetricsSection from './QualityMetricsSection'
 import MultiSelect from './MultiSelect'
 import ExcludedCampaignsFilter from './ExcludedCampaignsFilter'
+import ExcludedUtmsFilter from './ExcludedUtmsFilter'
 import { currentMonthBRT, yesterdayBRT, getDatePresets } from '../../utils/dateBRT'
-
-function currentMonthRange() {
-  return currentMonthBRT()
-}
 
 interface Props {
   pages: PageData[]
 }
 
 export default function ConversionsSection({ pages }: Props) {
-  const [dateFrom, setDateFrom] = useState(() => currentMonthRange().from)
-  const [dateTo, setDateTo] = useState(() => currentMonthRange().to)
+  const [dateFrom, setDateFrom] = useState(() => currentMonthBRT().from)
+  const [dateTo, setDateTo] = useState(() => yesterdayBRT())
 
   // Existing channel filter (buttons)
   const [activeChannels, setActiveChannels] = useState<string[]>([])
@@ -46,9 +44,10 @@ export default function ConversionsSection({ pages }: Props) {
   const [onlyActive, setOnlyActive] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(true)
 
-  // CEA config + excluded campaigns + goals (Supabase-persisted)
+  // CEA config + excluded campaigns + excluded UTMs + goals (Supabase-persisted)
   const { config: ceaConfig, saveConfig: saveCeaConfig, syncing: ceaSyncing } = useCeaConfig()
   const { excluded: excludedCampaigns, updateExcluded: setExcludedCampaigns } = useExcludedCampaigns()
+  const { excluded: excludedUtms, updateExcluded: setExcludedUtms } = useExcludedUtms()
   const { goals, saveGoals, syncing: goalsSyncing } = useGoalsConfig()
   const [goalsDrawerOpen, setGoalsDrawerOpen] = useState(false)
 
@@ -83,19 +82,36 @@ export default function ConversionsSection({ pages }: Props) {
     return [...codes]
   }, [excludedCampaigns])
 
-  const filteredEvents = useMemo(
-    () =>
-      excludedCodes.length > 0
-        ? rawEvents.filter((ev) => {
-            const rawCampaign = ev.payload?.deal?.utmCampaign
-            const utmCampaign = typeof rawCampaign === 'string' ? rawCampaign : ''
-            const m = utmCampaign.match(/\b([A-Za-z]+\d+)\b/)
-            const code = m ? m[1]! : ''
-            return !code || !excludedCodes.includes(code)
-          })
-        : rawEvents,
-    [rawEvents, excludedCodes],
-  )
+  // All unique UTM campaign values from Supabase events (for UTM exclusion filter)
+  const allUtmCampaigns = useMemo(() => {
+    const values = new Set<string>()
+    for (const ev of rawEvents) {
+      const raw = ev.payload?.deal?.utmCampaign
+      if (typeof raw === 'string' && raw.trim()) values.add(raw.trim())
+    }
+    return [...values].sort()
+  }, [rawEvents])
+
+  const filteredEvents = useMemo(() => {
+    let events = rawEvents
+    if (excludedCodes.length > 0) {
+      events = events.filter((ev) => {
+        const rawCampaign = ev.payload?.deal?.utmCampaign
+        const utmCampaign = typeof rawCampaign === 'string' ? rawCampaign : ''
+        const m = utmCampaign.match(/\b([A-Za-z]+\d+)\b/)
+        const code = m ? m[1]! : ''
+        return !code || !excludedCodes.includes(code)
+      })
+    }
+    if (excludedUtms.length > 0) {
+      events = events.filter((ev) => {
+        const raw = ev.payload?.deal?.utmCampaign
+        const utmCampaign = typeof raw === 'string' ? raw.trim() : ''
+        return !utmCampaign || !excludedUtms.includes(utmCampaign)
+      })
+    }
+    return events
+  }, [rawEvents, excludedCodes, excludedUtms])
 
   // Auto-initialize revenue filter: select all except low-revenue tiers
   const lastInitedEventsRef = useRef<typeof rawEvents | null>(null)
@@ -433,6 +449,12 @@ export default function ConversionsSection({ pages }: Props) {
                 allCampaigns={allWindsorCampaigns}
                 excluded={excludedCampaigns}
                 onChange={setExcludedCampaigns}
+              />
+
+              <ExcludedUtmsFilter
+                allUtms={allUtmCampaigns}
+                excluded={excludedUtms}
+                onChange={setExcludedUtms}
               />
 
               <button
