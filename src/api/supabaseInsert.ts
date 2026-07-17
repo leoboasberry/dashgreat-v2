@@ -8,7 +8,15 @@ function getSupabaseBase(): { url: string; key: string } | null {
   return { url, key }
 }
 
-function baseHeaders(key: string) {
+// GET requests must NOT include Content-Type — it triggers CORS preflight that Supabase blocks
+function readHeaders(key: string) {
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+  }
+}
+
+function writeHeaders(key: string) {
   return {
     apikey: key,
     Authorization: `Bearer ${key}`,
@@ -48,19 +56,25 @@ export async function fetchExistingIndex(
 
   const index: ExistingIndex = { byDealId: new Set(), byEmailCampaign: new Set() }
   const base = `${sb.url}/rest/v1/events`
-  const qs = `select=deal_id,email_norm,utm_campaign&event_type=eq.${eventType}&event_date=gte.${dateFrom}&event_date=lte.${dateTo}`
+  // Select only columns confirmed to work via anon key; extract utm_campaign from payload
+  const qs = `select=deal_id,email_norm,payload&event_type=eq.${eventType}&event_date=gte.${dateFrom}&event_date=lte.${dateTo}`
 
-  function addToIndex(row: { deal_id: string; email_norm: string | null; utm_campaign: string | null }) {
-    index.byDealId.add(row.deal_id)
-    if (row.email_norm && row.utm_campaign) {
-      index.byEmailCampaign.add(`${row.email_norm}|${row.utm_campaign}`)
+  function addToIndex(row: { deal_id: string; email_norm?: string | null; payload?: unknown }) {
+    if (row.deal_id) index.byDealId.add(row.deal_id)
+    // Extract utm_campaign from payload.deal.utmCampaign or payload.utmCampaign
+    const p = row.payload as Record<string, unknown> | null | undefined
+    const rawUtm = (p?.deal as Record<string, unknown>)?.utmCampaign ?? p?.utmCampaign
+    const utmCampaign = typeof rawUtm === 'string' ? rawUtm : null
+    const email = row.email_norm ?? null
+    if (email && utmCampaign) {
+      index.byEmailCampaign.add(`${email}|${utmCampaign}`)
     }
   }
 
   try {
     const first = await fetch(`${base}?${qs}`, {
       headers: {
-        ...baseHeaders(sb.key),
+        ...readHeaders(sb.key),
         Range: `0-${PAGE_SIZE - 1}`,
         'Range-Unit': 'items',
         Prefer: 'count=exact',
@@ -72,7 +86,7 @@ export async function fetchExistingIndex(
       return { index, error: `Supabase retornou HTTP ${first.status}: ${text.slice(0, 300)}` }
     }
 
-    const firstData: Array<{ deal_id: string; email_norm: string | null; utm_campaign: string | null }> =
+    const firstData: Array<{ deal_id: string; email_norm?: string | null; payload?: unknown }> =
       await first.json()
     firstData.forEach(addToIndex)
 
@@ -85,14 +99,14 @@ export async function fetchExistingIndex(
       const to = from + PAGE_SIZE - 1
       const next = await fetch(`${base}?${qs}`, {
         headers: {
-          ...baseHeaders(sb.key),
+          ...readHeaders(sb.key),
           Range: `${from}-${to}`,
           'Range-Unit': 'items',
           Prefer: 'count=none',
         },
       })
       if (!next.ok) break
-      const nextData: Array<{ deal_id: string; email_norm: string | null; utm_campaign: string | null }> =
+      const nextData: Array<{ deal_id: string; email_norm?: string | null; payload?: unknown }> =
         await next.json()
       nextData.forEach(addToIndex)
       fetched += nextData.length
@@ -148,7 +162,7 @@ export async function upsertCrmRows(
       const res = await fetch(`${sb.url}/rest/v1/events?on_conflict=event_id`, {
         method: 'POST',
         headers: {
-          ...baseHeaders(sb.key),
+          ...writeHeaders(sb.key),
           Prefer: 'resolution=ignore-duplicates,return=minimal',
         },
         body: JSON.stringify(batch),
