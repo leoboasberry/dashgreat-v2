@@ -37,7 +37,7 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
   if (!supabaseUrl || !anonKey) return []
 
-  const cacheKey = `supabase_events_v3_${dateFrom}_${dateTo}`
+  const cacheKey = `supabase_events_v2_${dateFrom}_${dateTo}`
 
   // 1. In-memory hit
   if (memCache.has(cacheKey)) return memCache.get(cacheKey)!
@@ -59,7 +59,7 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
   const qs = `select=event_type,deal_id,event_date,event_ts,email_norm,payload&event_date=gte.${dateFrom}&event_date=lte.${dateTo}`
 
   const first = await fetch(`${base}?${qs}`, {
-    headers: { ...headers, Range: `0-${PAGE_SIZE - 1}`, 'Range-Unit': 'items', Prefer: 'count=exact' },
+    headers: { ...headers, Range: `0-${PAGE_SIZE - 1}`, 'Range-Unit': 'items', Prefer: 'count=estimated' },
   })
   if (!first.ok) {
     const text = await first.text()
