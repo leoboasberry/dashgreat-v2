@@ -127,12 +127,14 @@ export interface AudienceRow {
   zip: string | null
   city: string | null
   state: string | null
+  // For value-based lookalike audiences (deal_won MRR)
+  value: number | null
   // Reference fields (not sent to Meta, shown in preview)
   utmCampaign: string
   utmSource: string
   pageName: string
   leadDate: string
-  highestStage: string | null  // highest CRM stage reached
+  highestStage: string | null
   segment: string | null
   faturamento: string | null
 }
@@ -149,10 +151,15 @@ function csvCell(v: string): string {
 
 /**
  * Builds a Meta Ads–compatible CSV.
- * Columns: email, phone, fn, ln, country, zip, ct, st
+ * Columns: email, phone, fn, ln, country, zip, ct, st[, value]
+ * The `value` column is included when at least one row has a deal_won MRR value,
+ * enabling value-based lookalike audiences in Meta.
  */
 export function buildMetaCsv(rows: AudienceRow[]): string {
+  const hasValue = rows.some((r) => r.value !== null && r.value !== undefined)
   const headers = ['email', 'phone', 'fn', 'ln', 'country', 'zip', 'ct', 'st']
+  if (hasValue) headers.push('value')
+
   const lines: string[] = [headers.join(',')]
 
   for (const r of rows) {
@@ -166,6 +173,7 @@ export function buildMetaCsv(rows: AudienceRow[]): string {
       r.city ?? '',
       r.state ?? '',
     ].map(csvCell)
+    if (hasValue) cols.push(r.value !== null && r.value !== undefined ? String(r.value) : '')
     lines.push(cols.join(','))
   }
 

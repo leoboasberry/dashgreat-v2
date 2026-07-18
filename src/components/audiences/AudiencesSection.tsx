@@ -10,7 +10,7 @@ import {
   STAGE_LABEL_AUDIENCE,
   type AudienceRow,
 } from '../../utils/audienceExport'
-import { fetchCrmByEmail } from '../../api/supabaseAudience'
+import { fetchCrmByEmail, type CrmEntry } from '../../api/supabaseAudience'
 
 interface Props {
   pages: PageData[]
@@ -41,7 +41,7 @@ export default function AudiencesSection({ pages }: Props) {
   const [requireAllStages, setRequireAllStages] = useState(false)
 
   // CRM enrichment state
-  const [crmMap, setCrmMap] = useState<Map<string, { stages: Set<string>; segment: string | null; revenue: string | null }> | null>(null)
+  const [crmMap, setCrmMap] = useState<Map<string, CrmEntry> | null>(null)
   const [crmLoading, setCrmLoading] = useState(false)
   const [crmError, setCrmError] = useState<string | null>(null)
 
@@ -89,6 +89,7 @@ export default function AudiencesSection({ pages }: Props) {
           zip: contact.zip,
           city: contact.city,
           state: contact.state,
+          value: null,
           utmCampaign,
           utmSource,
           pageName: page.summary.titulo,
@@ -146,6 +147,7 @@ export default function AudiencesSection({ pages }: Props) {
         highestStage: highestStage(crm.stages),
         segment: r.segment || crm.segment,
         faturamento: r.faturamento || crm.revenue,
+        value: crm.stages.has('deal_won') ? (crm.mrr ?? null) : null,
       }
     })
   }, [dedupedLeads, crmMap])
@@ -386,6 +388,7 @@ export default function AudiencesSection({ pages }: Props) {
                   <th className="text-left px-4 py-2.5 font-medium text-gray-500 whitespace-nowrap">Faturamento</th>
                   <th className="text-left px-4 py-2.5 font-medium text-gray-500 whitespace-nowrap">Segmento</th>
                   {crmMap && <th className="text-left px-4 py-2.5 font-medium text-gray-500 whitespace-nowrap">Estágio CRM</th>}
+                  {crmMap && <th className="text-left px-4 py-2.5 font-medium text-gray-500 whitespace-nowrap">Valor MRR</th>}
                 </tr>
               </thead>
               <tbody>
@@ -408,6 +411,13 @@ export default function AudiencesSection({ pages }: Props) {
                       <td className="px-4 py-2 whitespace-nowrap">
                         {r.highestStage
                           ? <StageBadge stage={r.highestStage} />
+                          : <span className="text-gray-300">—</span>}
+                      </td>
+                    )}
+                    {crmMap && (
+                      <td className="px-4 py-2 whitespace-nowrap text-emerald-700 font-medium">
+                        {r.value !== null
+                          ? `R$ ${r.value.toLocaleString('pt-BR')}`
                           : <span className="text-gray-300">—</span>}
                       </td>
                     )}

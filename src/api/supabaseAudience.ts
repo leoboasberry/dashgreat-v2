@@ -15,22 +15,36 @@ export interface CrmEmailEvent {
   email_norm: string
   event_type: string
   payload: {
-    deal?: { segment?: string; revenue?: string; utmCampaign?: string }
+    deal?: {
+      segment?: string
+      revenue?: string
+      utmCampaign?: string
+      potentialNewMRR?: number | string | null
+      annualRevenue?: string | null
+    }
     segment?: string
     revenue?: string
   } | null
 }
 
+export interface CrmEntry {
+  stages: Set<string>
+  segment: string | null
+  revenue: string | null
+  mrr: number | null   // potentialNewMRR from deal_won payload
+}
+
 /**
  * Fetches CRM events for the given event types and date range.
- * Returns a map of email_norm → Set of event_types, plus segment/revenue from payload.
+ * Returns a map of email_norm → CrmEntry.
+ * For deal_won events, also captures potentialNewMRR for value-based audiences.
  */
 export async function fetchCrmByEmail(
   eventTypes: string[],
   dateFrom: string,
   dateTo: string,
-): Promise<{ map: Map<string, { stages: Set<string>; segment: string | null; revenue: string | null }>; error: string | null }> {
-  const empty = new Map<string, { stages: Set<string>; segment: string | null; revenue: string | null }>()
+): Promise<{ map: Map<string, CrmEntry>; error: string | null }> {
+  const empty = new Map<string, CrmEntry>()
   const sb = getSupabaseBase()
   if (!sb) return { map: empty, error: null }
   if (eventTypes.length === 0) return { map: empty, error: null }
@@ -40,16 +54,24 @@ export async function fetchCrmByEmail(
   const orFilter = `or=(${eventTypes.map((t) => `event_type.eq.${t}`).join(',')})`
   const qs = `select=email_norm,event_type,payload&${orFilter}&event_date=gte.${dateFrom}&event_date=lte.${dateTo}`
 
-  const result = new Map<string, { stages: Set<string>; segment: string | null; revenue: string | null }>()
+  const result = new Map<string, CrmEntry>()
 
   function add(row: CrmEmailEvent) {
     if (!row.email_norm) return
-    const existing = result.get(row.email_norm) ?? { stages: new Set(), segment: null, revenue: null }
+    const existing = result.get(row.email_norm) ?? { stages: new Set(), segment: null, revenue: null, mrr: null }
     existing.stages.add(row.event_type)
     const seg = row.payload?.deal?.segment ?? row.payload?.segment ?? null
     const rev = row.payload?.deal?.revenue ?? row.payload?.revenue ?? null
     if (seg && !existing.segment) existing.segment = seg
     if (rev && !existing.revenue) existing.revenue = rev
+    // Capture MRR from deal_won events
+    if (row.event_type === 'deal_won' && existing.mrr === null) {
+      const rawMrr = row.payload?.deal?.potentialNewMRR
+      if (rawMrr !== null && rawMrr !== undefined) {
+        const parsed = typeof rawMrr === 'number' ? rawMrr : parseFloat(String(rawMrr).replace(',', '.'))
+        if (!isNaN(parsed)) existing.mrr = parsed
+      }
+    }
     result.set(row.email_norm, existing)
   }
 
