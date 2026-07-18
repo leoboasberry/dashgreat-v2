@@ -263,15 +263,11 @@ export default function BackfillSection({ pages }: Props) {
               {(step === 'preview' || step === 'ready') && (
                 <button
                   onClick={handleCheck}
-                  disabled={step === 'checking' || missingSupabase}
+                  disabled={missingSupabase}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  {step === 'checking' ? (
-                    <Loader2 size={12} className="animate-spin" />
-                  ) : (
-                    <Search size={12} />
-                  )}
-                  {step === 'checking' ? 'Verificando…' : 'Verificar Supabase'}
+                  <Search size={12} />
+                  Verificar Supabase
                 </button>
               )}
 
@@ -279,7 +275,7 @@ export default function BackfillSection({ pages }: Props) {
               {(step === 'ready' || step === 'preview') && (
                 <button
                   onClick={handleImport}
-                  disabled={missingSupabase || step === 'importing' || (step === 'ready' && newRows.length === 0)}
+                  disabled={missingSupabase || (step === 'ready' && newRows.length === 0)}
                   className="flex items-center gap-1.5 text-xs font-semibold px-4 py-1.5 rounded-lg bg-[#0D2F9F] text-white hover:bg-[#0a2480] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   <Database size={12} />

@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react'
-import { Plus, Zap, ZapOff, Pencil, Trash2, Play, RefreshCw, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Plus, Zap, ZapOff, Pencil, Trash2, Play, RefreshCw, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 import type { PageData } from '../../hooks/useDashboard'
 import type { PixelConfig, DispatchLogEntry } from '../../types/capi'
 import type { LeadEnrichment } from '../../types/capi'
