@@ -11,6 +11,7 @@ import CampaignsSection from './components/campaigns/CampaignsSection'
 import ConversionsSection from './components/conversions/ConversionsSection'
 import LeadsSection from './components/leads/LeadsSection'
 import BackfillSection from './components/backfill/BackfillSection'
+import AudiencesSection from './components/audiences/AudiencesSection'
 import { clearAllCache } from './api/cache'
 
 const STORAGE_KEY = 'gp_config'
@@ -31,7 +32,7 @@ const ENV_CONFIG: Config | null =
 // Password stored as plain text env var (VITE_GP_PASSWORD) or as SHA-256 hash in localStorage
 const ENV_PASSWORD: string = (import.meta.env.VITE_GP_PASSWORD as string) ?? ''
 
-type Tab = 'overview' | 'campaigns' | 'conversions' | 'leads' | 'backfill'
+type Tab = 'overview' | 'campaigns' | 'conversions' | 'leads' | 'backfill' | 'audiences'
 
 function loadConfig(): Config | null {
   try {
@@ -195,6 +196,9 @@ export default function App() {
           <TabButton active={activeTab === 'backfill'} onClick={() => setActiveTab('backfill')}>
             Backfill CRM
           </TabButton>
+          <TabButton active={activeTab === 'audiences'} onClick={() => setActiveTab('audiences')}>
+            Audiências Meta
+          </TabButton>
         </div>
       </header>
 
@@ -220,6 +224,9 @@ export default function App() {
 
         {/* ── Backfill CRM — always available ── */}
         {activeTab === 'backfill' && <BackfillSection pages={pages} />}
+
+        {/* ── Audiências Meta — always available ── */}
+        {activeTab === 'audiences' && <AudiencesSection pages={pages} />}
 
         {pages.length > 0 && (
           <>
