@@ -136,7 +136,14 @@ async function sendBatch(
       body: JSON.stringify(body),
     })
     const data = await res.json()
-    if (!res.ok) return { sent: 0, error: data?.error?.message ?? `HTTP ${res.status}` }
+    if (!res.ok) {
+      const err   = data?.error
+      const parts = [err?.message ?? `HTTP ${res.status}`]
+      if (err?.code)           parts.push(`code=${err.code}`)
+      if (err?.error_subcode)  parts.push(`subcode=${err.error_subcode}`)
+      if (err?.error_user_msg) parts.push(err.error_user_msg)
+      return { sent: 0, error: parts.join(' | ') }
+    }
     return { sent: data.events_received ?? 0 }
   } catch (e) {
     return { sent: 0, error: String(e) }
@@ -282,7 +289,7 @@ Deno.serve(async (req: Request) => {
           event_name:    metaName,
           event_time:    eventTs,
           event_id:      ev.event_id,
-          action_source: 'crm',
+          action_source: 'system_generated',
           user_data:     userData,
           custom_data:   customData,
         })
