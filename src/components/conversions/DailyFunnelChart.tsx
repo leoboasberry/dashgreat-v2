@@ -390,6 +390,7 @@ export default function DailyFunnelChart({ dailyFunnel, filteredLeads, mqlEvents
                 )}
                 <Tooltip
                   content={<CustomTooltip onOpenDay={openDay} />}
+                  wrapperStyle={{ pointerEvents: 'auto' }}
                 />
 
                 {weekendBands.map(({ x1, x2 }) => (
