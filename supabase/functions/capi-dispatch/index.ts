@@ -257,6 +257,41 @@ Deno.serve(async (req: Request) => {
         passesFilters(ev, (pixel.filters ?? {}) as Filters)
       )
 
+      // ── Fetch enrichments from lead_enrichments table ─────────────────────
+      // This provides phone/name/city/state/zip/fbc for auto-dispatch (pg_cron)
+      // which doesn't receive enrichData from the browser.
+
+      const emailsToEnrich = [
+        ...new Set(
+          toSend
+            .map(ev => ev.email_norm as string | null)
+            .filter((e): e is string => !!e)
+        ),
+      ]
+
+      const dbEnrichMap: Record<string, EnrichEntry> = {}
+      if (emailsToEnrich.length > 0) {
+        const { data: enrichRows } = await sb
+          .from('lead_enrichments')
+          .select('email_norm,phone,fn,ln,city,state,zip,fbp,fbc,fbclid,lead_ts')
+          .in('email_norm', emailsToEnrich)
+
+        for (const r of (enrichRows ?? []) as Array<Record<string, unknown>>) {
+          dbEnrichMap[r.email_norm as string] = {
+            phone:   r.phone   as string | undefined,
+            fn:      r.fn      as string | undefined,
+            ln:      r.ln      as string | undefined,
+            city:    r.city    as string | undefined,
+            state:   r.state   as string | undefined,
+            zip:     r.zip     as string | undefined,
+            fbp:     r.fbp     as string | undefined,
+            fbc:     r.fbc     as string | undefined,
+            fbclid:  r.fbclid  as string | undefined,
+            leadTs:  r.lead_ts as number | undefined,
+          }
+        }
+      }
+
       // ── Build CAPI events ─────────────────────────────────────────────────
 
       const capiEvents: unknown[] = []
@@ -267,7 +302,8 @@ Deno.serve(async (req: Request) => {
         if (!metaName) continue
 
         const email  = ev.email_norm as string | null
-        const enrich = body.enrichData?.[email ?? ''] ?? null
+        // Priority: browser enrichData (manual dispatch) > lead_enrichments DB > null
+        const enrich = body.enrichData?.[email ?? ''] ?? dbEnrichMap[email ?? ''] ?? null
         const deal   = ((ev.payload as Record<string, unknown>)?.deal ?? {}) as Record<string, unknown>
 
         const rawMrr = deal.potentialNewMRR

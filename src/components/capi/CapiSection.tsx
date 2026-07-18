@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Plus, Zap, ZapOff, Pencil, Trash2, Play, RefreshCw, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 import type { PageData } from '../../hooks/useDashboard'
 import type { PixelConfig, DispatchLogEntry } from '../../types/capi'
 import type { LeadEnrichment } from '../../types/capi'
 import { useCapiConfig } from '../../hooks/useCapiConfig'
 import { extractContactFields, extractFbParams } from '../../utils/audienceExport'
+import { upsertEnrichments } from '../../api/supabaseEnrichment'
 import PixelConfigModal from './PixelConfigModal'
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL as string
@@ -78,6 +79,13 @@ export default function CapiSection({ pages }: Props) {
   const [dateTo, setDateTo] = useState(todayBRT)
 
   const enrichMap = useMemo(() => buildEnrichMap(pages), [pages])
+
+  // Sync enrichment data to Supabase so pg_cron auto-dispatch has full matching data
+  useEffect(() => {
+    if (Object.keys(enrichMap).length > 0) {
+      upsertEnrichments(enrichMap).catch(() => {})
+    }
+  }, [enrichMap])
 
   // ── Dispatch via Edge Function ────────────────────────────────────────────
 
