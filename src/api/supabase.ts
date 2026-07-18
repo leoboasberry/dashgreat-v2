@@ -10,6 +10,7 @@ export interface SupabaseEvent {
   deal_id: string
   event_date: string | null
   event_ts: string | null
+  email_norm: string | null
   payload: {
     deal?: {
       platform?: string
@@ -21,6 +22,7 @@ export interface SupabaseEvent {
       segment?: string
     }
     utmSource?: string
+    utmCampaign?: string
     /** Top-level fallbacks (some events store these outside deal) */
     pagina?: string
     revenue?: string
@@ -35,7 +37,7 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
   if (!supabaseUrl || !anonKey) return []
 
-  const cacheKey = `supabase_events_v2_${dateFrom}_${dateTo}`
+  const cacheKey = `supabase_events_v3_${dateFrom}_${dateTo}`
 
   // 1. In-memory hit
   if (memCache.has(cacheKey)) return memCache.get(cacheKey)!
@@ -54,7 +56,7 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
   }
 
   const base = `${supabaseUrl}/rest/v1/events`
-  const qs = `select=event_type,deal_id,event_date,event_ts,payload&event_date=gte.${dateFrom}&event_date=lte.${dateTo}`
+  const qs = `select=event_type,deal_id,event_date,event_ts,email_norm,payload&event_date=gte.${dateFrom}&event_date=lte.${dateTo}`
 
   const first = await fetch(`${base}?${qs}`, {
     headers: { ...headers, Range: `0-${PAGE_SIZE - 1}`, 'Range-Unit': 'items', Prefer: 'count=exact' },

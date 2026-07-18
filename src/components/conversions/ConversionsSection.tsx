@@ -165,7 +165,7 @@ export default function ConversionsSection({ pages }: Props) {
     [filteredWindsorRows, filteredEvents, activeChannels, selCampaigns, selAdSets, selAds, selPages, selRevenue, selSegments, onlyActive],
   )
 
-  const { totalSpend, funnelCounts, totalMRR, byChannel, byAd, byAdSet, byCampaign, dailySpend, dailyFunnel, investmentPartial, campaignStatuses } = metrics
+  const { totalSpend, funnelCounts, totalMRR, byChannel, byAd, byAdSet, byCampaign, dailySpend, dailyFunnel, mqlEventsByDate, investmentPartial, campaignStatuses } = metrics
 
   // GreatPages leads filtered by date + active filters
   const filteredLeadsList = useMemo(() => {
@@ -526,7 +526,7 @@ export default function ConversionsSection({ pages }: Props) {
 
           <DailyLeadsChart filteredLeads={filteredLeadsList} />
 
-          <DailyFunnelChart dailyFunnel={dailyFunnel} filteredLeads={filteredLeadsList} />
+          <DailyFunnelChart dailyFunnel={dailyFunnel} filteredLeads={filteredLeadsList} mqlEventsByDate={mqlEventsByDate} />
 
           <InvestmentChart data={dailySpend} activeChannels={activeChannels} dateFrom={dateFrom} dateTo={dateTo} />
 

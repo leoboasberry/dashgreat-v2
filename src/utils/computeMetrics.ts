@@ -1,5 +1,6 @@
 import type { WindsorRow } from '../api/windsor'
 import type { SupabaseEvent } from '../api/supabase'
+export type { SupabaseEvent }
 import { parseCampaign } from './parseLeads'
 import { normalizeWindsorChannel, normalizeCrmChannel, CHANNELS, type Channel } from './channelNorm'
 
@@ -117,6 +118,8 @@ export interface MetricsResult {
   adStatuses: Record<string, string>
   /** Most recent status per adset key (Meta only) */
   adSetStatuses: Record<string, string>
+  /** MQL events grouped by event_date, deduped by deal_id per day */
+  mqlEventsByDate: Record<string, SupabaseEvent[]>
 }
 
 // ── Helpers ──
@@ -576,6 +579,20 @@ export function computeMetrics(
     spend: CHANNELS.reduce((s, ch) => s + (spendByDateChannel[date]?.[ch] ?? 0), 0),
   }))
 
+  // MQL events by date (deduped by deal_id per day, for the drill-down modal)
+  const mqlEventsByDate: Record<string, SupabaseEvent[]> = {}
+  const seenDayDeal = new Set<string>()
+  for (const ev of channelFilteredEvents) {
+    if (ev.event_type === 'mql' && ev.event_date) {
+      const key = `${ev.event_date}::${ev.deal_id}`
+      if (!seenDayDeal.has(key)) {
+        seenDayDeal.add(key)
+        if (!mqlEventsByDate[ev.event_date]) mqlEventsByDate[ev.event_date] = []
+        mqlEventsByDate[ev.event_date].push(ev)
+      }
+    }
+  }
+
   // ── By-ad breakdown ──
 
   // Step 1: Compute spend by ad (needed to resolve deal → spend key mapping)
@@ -801,6 +818,7 @@ export function computeMetrics(
     byCampaign,
     dailySpend,
     dailyFunnel,
+    mqlEventsByDate,
     investmentPartial,
     campaignStatuses,
     adStatuses,
