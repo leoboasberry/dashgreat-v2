@@ -396,6 +396,27 @@ export function buildMetaCsv(rows: AudienceRow[]): string {
   return lines.join('\n')
 }
 
+// ── Facebook tracking param extraction ───────────────────────────────────────
+
+export interface FbParams {
+  fbp?: string     // _fbp browser pixel cookie — NOT hashed
+  fbc?: string     // _fbc click cookie — NOT hashed
+  fbclid?: string  // raw click ID — used to build fbc if fbc missing
+}
+
+export function extractFbParams(raw: Record<string, string>): FbParams {
+  const result: FbParams = {}
+  for (const [key, value] of Object.entries(raw)) {
+    const k = norm(key)
+    const v = String(value ?? '').trim()
+    if (!v) continue
+    if (k === 'fbp' || k === '_fbp') result.fbp = v
+    else if (k === 'fbc' || k === '_fbc') result.fbc = v
+    else if (k === 'fbclid') result.fbclid = v
+  }
+  return result
+}
+
 // ── CRM stage helpers ─────────────────────────────────────────────────────────
 
 export const STAGE_ORDER_AUDIENCE = [

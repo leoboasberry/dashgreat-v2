@@ -12,6 +12,7 @@ import ConversionsSection from './components/conversions/ConversionsSection'
 import LeadsSection from './components/leads/LeadsSection'
 import BackfillSection from './components/backfill/BackfillSection'
 import AudiencesSection from './components/audiences/AudiencesSection'
+import CapiSection from './components/capi/CapiSection'
 import { clearAllCache } from './api/cache'
 
 const STORAGE_KEY = 'gp_config'
@@ -32,7 +33,7 @@ const ENV_CONFIG: Config | null =
 // Password stored as plain text env var (VITE_GP_PASSWORD) or as SHA-256 hash in localStorage
 const ENV_PASSWORD: string = (import.meta.env.VITE_GP_PASSWORD as string) ?? ''
 
-type Tab = 'overview' | 'campaigns' | 'conversions' | 'leads' | 'backfill' | 'audiences'
+type Tab = 'overview' | 'campaigns' | 'conversions' | 'leads' | 'backfill' | 'audiences' | 'capi'
 
 function loadConfig(): Config | null {
   try {
@@ -199,6 +200,9 @@ export default function App() {
           <TabButton active={activeTab === 'audiences'} onClick={() => setActiveTab('audiences')}>
             Audiências Meta
           </TabButton>
+          <TabButton active={activeTab === 'capi'} onClick={() => setActiveTab('capi')}>
+            CAPI Meta
+          </TabButton>
         </div>
       </header>
 
@@ -227,6 +231,9 @@ export default function App() {
 
         {/* ── Audiências Meta — always available ── */}
         {activeTab === 'audiences' && <AudiencesSection pages={pages} />}
+
+        {/* ── CAPI Meta — always available ── */}
+        {activeTab === 'capi' && <CapiSection pages={pages} />}
 
         {pages.length > 0 && (
           <>
