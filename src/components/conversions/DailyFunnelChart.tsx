@@ -88,51 +88,51 @@ function MqlDayModal({
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-3">
-            <List size={16} className="text-[#0D2F9F]" />
-            <h3 className="font-semibold text-gray-800 text-sm">
+            <List size={17} className="text-[#0D2F9F]" />
+            <h3 className="font-semibold text-gray-800">
               MQLs de {fmtDate(date)}
             </h3>
-            <span className="text-xs bg-blue-50 text-[#0D2F9F] font-medium px-2 py-0.5 rounded-full">
+            <span className="text-xs bg-blue-50 text-[#0D2F9F] font-medium px-2.5 py-1 rounded-full">
               {events.length} deal{events.length !== 1 ? 's' : ''}
             </span>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <X size={16} />
+            <X size={17} />
           </button>
         </div>
 
         {/* Table */}
         <div className="overflow-auto flex-1">
           {sorted.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-10">Nenhum MQL neste dia.</p>
+            <p className="text-sm text-gray-400 text-center py-12">Nenhum MQL neste dia.</p>
           ) : (
-            <table className="w-full text-xs">
+            <table className="w-full text-sm">
               <thead className="sticky top-0 bg-gray-50 border-b border-gray-100">
                 <tr>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium whitespace-nowrap">Empresa</th>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium whitespace-nowrap">Faturamento</th>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium whitespace-nowrap">Segmento</th>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium whitespace-nowrap">UTM</th>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium whitespace-nowrap">Data e Horário</th>
+                  <th className="text-left px-6 py-3 text-gray-500 font-medium whitespace-nowrap">Empresa</th>
+                  <th className="text-left px-6 py-3 text-gray-500 font-medium whitespace-nowrap">Faturamento</th>
+                  <th className="text-left px-6 py-3 text-gray-500 font-medium whitespace-nowrap">Segmento</th>
+                  <th className="text-left px-6 py-3 text-gray-500 font-medium whitespace-nowrap">UTM</th>
+                  <th className="text-left px-6 py-3 text-gray-500 font-medium whitespace-nowrap">Data e Horário</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {sorted.map((ev, i) => (
                   <tr key={i} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-2.5 text-gray-700 font-mono truncate max-w-[180px]" title={ev.email_norm ?? ''}>
+                    <td className="px-6 py-3.5 text-gray-700 font-mono" title={ev.email_norm ?? ''}>
                       {ev.email_norm ?? '—'}
                     </td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{evtRevenue(ev)}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{evtSegment(ev)}</td>
-                    <td className="px-4 py-2.5 text-gray-500 font-mono whitespace-nowrap">{evtUtm(ev)}</td>
-                    <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap">{formatBRT(ev.event_ts)}</td>
+                    <td className="px-6 py-3.5 text-gray-600 whitespace-nowrap">{evtRevenue(ev)}</td>
+                    <td className="px-6 py-3.5 text-gray-600 whitespace-nowrap">{evtSegment(ev)}</td>
+                    <td className="px-6 py-3.5 text-gray-500 font-mono whitespace-nowrap">{evtUtm(ev)}</td>
+                    <td className="px-6 py-3.5 text-gray-500 whitespace-nowrap">{formatBRT(ev.event_ts)}</td>
                   </tr>
                 ))}
               </tbody>
