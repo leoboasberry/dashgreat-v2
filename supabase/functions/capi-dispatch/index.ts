@@ -208,8 +208,13 @@ Deno.serve(async (req: Request) => {
         if (elapsed < pixel.interval_minutes) continue
       }
 
-      const from = body.dateFrom ?? subtractDays(today, pixel.lookback_days)
-      const to   = body.dateTo   ?? today
+      // Meta CAPI standard endpoint (/events) enforces a 7-day event_time limit
+      // for ALL action_source values. Cap lookback to 7 days.
+      const MAX_LOOKBACK = 7
+      const earliestFrom = subtractDays(today, MAX_LOOKBACK)
+      const requestedFrom = body.dateFrom ?? subtractDays(today, Math.min(pixel.lookback_days, MAX_LOOKBACK))
+      const from = requestedFrom < earliestFrom ? earliestFrom : requestedFrom
+      const to   = body.dateTo ?? today
 
       const mapping    = (pixel.event_mapping ?? {}) as Record<string, string>
       const activeTypes = Object.entries(mapping).filter(([, v]) => v).map(([k]) => k)
@@ -272,9 +277,13 @@ Deno.serve(async (req: Request) => {
 
         const userData = await buildUserData(email, enrich)
 
+        const nowSec  = Math.floor(Date.now() / 1000)
         const eventTs = ev.event_ts
           ? Math.floor(new Date(ev.event_ts as string).getTime() / 1000)
-          : Math.floor(Date.now() / 1000)
+          : nowSec
+
+        // Skip events older than 7 days — Meta CAPI hard limit (subcode 2804003)
+        if (nowSec - eventTs > 7 * 24 * 60 * 60) continue
 
         const customData: Record<string, unknown> = {
           content_category: 'CRM',

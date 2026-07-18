@@ -74,7 +74,7 @@ export default function CapiSection({ pages }: Props) {
   const [modal, setModal] = useState<'new' | PixelConfig | null>(null)
   const [dispatching, setDispatching] = useState<Set<string>>(new Set())
   const today = todayBRT()
-  const [dateFrom, setDateFrom] = useState(() => subtractDays(todayBRT(), 30))
+  const [dateFrom, setDateFrom] = useState(() => subtractDays(todayBRT(), 7))
   const [dateTo, setDateTo] = useState(todayBRT)
 
   const enrichMap = useMemo(() => buildEnrichMap(pages), [pages])
@@ -123,8 +123,11 @@ export default function CapiSection({ pages }: Props) {
       <div>
         <h2 className="text-base font-semibold text-gray-800">CAPI Meta — Eventos CRM</h2>
         <p className="text-sm text-gray-400 mt-0.5">
-          Disparo contínuo de eventos offline do CRM para a Meta Conversions API.
-          O pg_cron executa automaticamente a cada 30 min, mesmo com o dashboard fechado.
+          Disparo contínuo de eventos CRM para a Meta Conversions API via pg_cron (a cada 30 min,
+          mesmo com o dashboard fechado).{' '}
+          <span className="text-amber-500 font-medium">
+            Limite do Meta: apenas eventos dos últimos 7 dias são aceitos.
+          </span>
         </p>
       </div>
 

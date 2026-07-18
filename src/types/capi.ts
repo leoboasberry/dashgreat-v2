@@ -105,7 +105,7 @@ export function defaultPixelConfig(overrides?: Partial<PixelConfig>): PixelConfi
     enabled: true,
     eventMapping: { ...DEFAULT_EVENT_MAPPING },
     filters: { eventTypes: [], segments: [], campaigns: [], utmSources: [], faturamentos: [] },
-    lookbackDays: 30,
+    lookbackDays: 7,
     autoDispatch: false,
     intervalMinutes: 60,
     ...overrides,
