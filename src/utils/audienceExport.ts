@@ -66,7 +66,7 @@ export function extractContactFields(raw: Record<string, string>): ContactFields
 
   for (const [key, value] of Object.entries(raw)) {
     const k = norm(key)
-    const v = (value ?? '').trim()
+    const v = String(value ?? '').trim()
     if (!v || v === '-') continue
 
     if (!email && (k.includes('email') || k === 'email' || k === 'emaildobuyer') && v.includes('@')) {
