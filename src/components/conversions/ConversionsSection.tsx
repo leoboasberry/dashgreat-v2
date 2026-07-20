@@ -23,26 +23,73 @@ import ExcludedCampaignsFilter from './ExcludedCampaignsFilter'
 import ExcludedUtmsFilter from './ExcludedUtmsFilter'
 import { currentMonthBRT, yesterdayBRT, getDatePresets } from '../../utils/dateBRT'
 
+// ── Filter persistence ────────────────────────────────────────────────────────
+
+const FILTERS_KEY = 'gp_conversions_filters_v1'
+
+interface SavedFilters {
+  dateFrom: string
+  dateTo: string
+  activeChannels: string[]
+  selCampaigns: string[]
+  selAdSets: string[]
+  selAds: string[]
+  selPages: string[]
+  selRevenue: string[]
+  selSegments: string[]
+  onlyActive: boolean
+  filtersOpen: boolean
+  revenueInitialized: boolean
+}
+
+function loadSaved(): Partial<SavedFilters> {
+  try {
+    const raw = localStorage.getItem(FILTERS_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveTo(partial: Partial<SavedFilters>) {
+  try {
+    const existing = loadSaved()
+    localStorage.setItem(FILTERS_KEY, JSON.stringify({ ...existing, ...partial }))
+  } catch {}
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 interface Props {
   pages: PageData[]
 }
 
 export default function ConversionsSection({ pages }: Props) {
-  const [dateFrom, setDateFrom] = useState(() => currentMonthBRT().from)
-  const [dateTo, setDateTo] = useState(() => yesterdayBRT())
+  const saved = useRef(loadSaved())
+
+  const [dateFrom, setDateFrom] = useState(() => saved.current.dateFrom ?? currentMonthBRT().from)
+  const [dateTo, setDateTo] = useState(() => saved.current.dateTo ?? yesterdayBRT())
 
   // Existing channel filter (buttons)
-  const [activeChannels, setActiveChannels] = useState<string[]>([])
+  const [activeChannels, setActiveChannels] = useState<string[]>(() => saved.current.activeChannels ?? [])
 
-  // New strategic filters
-  const [selCampaigns, setSelCampaigns] = useState<string[]>([])
-  const [selAdSets, setSelAdSets] = useState<string[]>([])
-  const [selAds, setSelAds] = useState<string[]>([])
-  const [selPages, setSelPages] = useState<string[]>([])
-  const [selRevenue, setSelRevenue] = useState<string[]>([])
-  const [selSegments, setSelSegments] = useState<string[]>([])
-  const [onlyActive, setOnlyActive] = useState(false)
-  const [filtersOpen, setFiltersOpen] = useState(true)
+  // Strategic filters
+  const [selCampaigns, setSelCampaigns] = useState<string[]>(() => saved.current.selCampaigns ?? [])
+  const [selAdSets, setSelAdSets] = useState<string[]>(() => saved.current.selAdSets ?? [])
+  const [selAds, setSelAds] = useState<string[]>(() => saved.current.selAds ?? [])
+  const [selPages, setSelPages] = useState<string[]>(() => saved.current.selPages ?? [])
+  const [selRevenue, setSelRevenue] = useState<string[]>(() => saved.current.selRevenue ?? [])
+  const [selSegments, setSelSegments] = useState<string[]>(() => saved.current.selSegments ?? [])
+  const [onlyActive, setOnlyActive] = useState(() => saved.current.onlyActive ?? false)
+  const [filtersOpen, setFiltersOpen] = useState(() => saved.current.filtersOpen ?? true)
+
+  // Track whether revenue was already initialized (from storage or auto-init)
+  const revenueInitialized = useRef(saved.current.revenueInitialized ?? false)
+
+  // Persist all filter state whenever anything changes
+  useEffect(() => {
+    saveTo({ dateFrom, dateTo, activeChannels, selCampaigns, selAdSets, selAds, selPages, selRevenue, selSegments, onlyActive, filtersOpen })
+  }, [dateFrom, dateTo, activeChannels, selCampaigns, selAdSets, selAds, selPages, selRevenue, selSegments, onlyActive, filtersOpen])
 
   // CEA config + excluded campaigns + excluded UTMs + goals (Supabase-persisted)
   const { config: ceaConfig, saveConfig: saveCeaConfig, syncing: ceaSyncing } = useCeaConfig()
@@ -113,9 +160,11 @@ export default function ConversionsSection({ pages }: Props) {
     return events
   }, [rawEvents, excludedCodes, excludedUtms])
 
-  // Auto-initialize revenue filter: select all except low-revenue tiers
+  // Auto-initialize revenue filter: select all except low-revenue tiers.
+  // Skipped when a saved value was restored from localStorage.
   const lastInitedEventsRef = useRef<typeof rawEvents | null>(null)
   useEffect(() => {
+    if (revenueInitialized.current) return
     if (rawEvents.length === 0 || rawEvents === lastInitedEventsRef.current) return
     lastInitedEventsRef.current = rawEvents
     const { revenue: allRevenue } = extractFilterOptions(filteredEvents)
@@ -123,6 +172,8 @@ export default function ConversionsSection({ pages }: Props) {
     const defaults = allRevenue.filter(
       (r) => !EXCLUDED.some((ex) => r.toLowerCase().includes(ex)),
     )
+    revenueInitialized.current = true
+    saveTo({ revenueInitialized: true })
     setSelRevenue(defaults)
   }, [rawEvents])
 
@@ -526,7 +577,7 @@ export default function ConversionsSection({ pages }: Props) {
 
           <DailyLeadsChart filteredLeads={filteredLeadsList} />
 
-          <DailyFunnelChart dailyFunnel={dailyFunnel} filteredLeads={filteredLeadsList} mqlEventsByDate={mqlEventsByDate} />
+          <DailyFunnelChart dailyFunnel={dailyFunnel} filteredLeads={filteredLeadsList} mqlEventsByDate={mqlEventsByDate} dateFrom={dateFrom} dateTo={dateTo} />
 
           <InvestmentChart data={dailySpend} activeChannels={activeChannels} dateFrom={dateFrom} dateTo={dateTo} />
 

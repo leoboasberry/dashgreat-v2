@@ -124,6 +124,18 @@ export interface MetricsResult {
 
 // ── Helpers ──
 
+// Returns the BRT date for an event. Falls back to deriving from event_ts when
+// event_date is null (events created before the column was backfilled).
+function getEventDate(ev: SupabaseEvent): string | null {
+  if (ev.event_date) return ev.event_date
+  if (!ev.event_ts) return null
+  try {
+    return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date(ev.event_ts))
+  } catch {
+    return null
+  }
+}
+
 function evtPagina(ev: SupabaseEvent): string {
   return ev.payload?.deal?.pagina ?? ev.payload?.pagina ?? ''
 }
@@ -562,9 +574,10 @@ export function computeMetrics(
   // ── Daily funnel (MQLs + spend per day) ──
   const mqlsByDate: Record<string, Set<string>> = {}
   for (const ev of channelFilteredEvents) {
-    if (ev.event_type === 'mql' && ev.deal_id && ev.event_date) {
-      if (!mqlsByDate[ev.event_date]) mqlsByDate[ev.event_date] = new Set()
-      mqlsByDate[ev.event_date].add(ev.deal_id)
+    const evDate = getEventDate(ev)
+    if (ev.event_type === 'mql' && ev.deal_id && evDate) {
+      if (!mqlsByDate[evDate]) mqlsByDate[evDate] = new Set()
+      mqlsByDate[evDate].add(ev.deal_id)
     }
   }
 
@@ -583,12 +596,13 @@ export function computeMetrics(
   const mqlEventsByDate: Record<string, SupabaseEvent[]> = {}
   const seenDayDeal = new Set<string>()
   for (const ev of channelFilteredEvents) {
-    if (ev.event_type === 'mql' && ev.event_date) {
-      const key = `${ev.event_date}::${ev.deal_id}`
+    const evDate = getEventDate(ev)
+    if (ev.event_type === 'mql' && evDate) {
+      const key = `${evDate}::${ev.deal_id}`
       if (!seenDayDeal.has(key)) {
         seenDayDeal.add(key)
-        if (!mqlEventsByDate[ev.event_date]) mqlEventsByDate[ev.event_date] = []
-        mqlEventsByDate[ev.event_date].push(ev)
+        if (!mqlEventsByDate[evDate]) mqlEventsByDate[evDate] = []
+        mqlEventsByDate[evDate].push(ev)
       }
     }
   }

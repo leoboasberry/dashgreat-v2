@@ -27,6 +27,19 @@ interface Props {
   dailyFunnel: DailyFunnelPoint[]
   filteredLeads: ParsedLead[]
   mqlEventsByDate: Record<string, SupabaseEvent[]>
+  dateFrom?: string
+  dateTo?: string
+}
+
+function generateDateRange(from: string, to: string): string[] {
+  const result: string[] = []
+  const cur = new Date(from + 'T00:00:00Z')
+  const end = new Date(to + 'T00:00:00Z')
+  while (cur <= end) {
+    result.push(cur.toISOString().slice(0, 10))
+    cur.setUTCDate(cur.getUTCDate() + 1)
+  }
+  return result
 }
 
 function fmtDate(d: string) {
@@ -189,7 +202,7 @@ type MetricKey = 'mqls' | 'cpmql' | 'leads'
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function DailyFunnelChart({ dailyFunnel, filteredLeads, mqlEventsByDate }: Props) {
+export default function DailyFunnelChart({ dailyFunnel, filteredLeads, mqlEventsByDate, dateFrom, dateTo }: Props) {
   const [collapsed, setCollapsed] = useState(false)
   const [active, setActive] = useState<Set<MetricKey>>(new Set(['mqls', 'cpmql']))
   const [modalDay, setModalDay] = useState<string | null>(null)
@@ -209,6 +222,7 @@ export default function DailyFunnelChart({ dailyFunnel, filteredLeads, mqlEvents
   }
 
   const allDates = new Set([
+    ...(dateFrom && dateTo ? generateDateRange(dateFrom, dateTo) : []),
     ...dailyFunnel.map((p) => p.date),
     ...Object.keys(leadsByDate),
   ])

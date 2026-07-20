@@ -32,12 +32,21 @@ export interface SupabaseEvent {
 
 const PAGE_SIZE = 1000
 
+// BRT = UTC-3 (fixed, Brazil dropped DST in 2019).
+// Filter by event_ts instead of event_date so events with event_date=null
+// (created before the column was backfilled) are still returned.
+function addDayISO(iso: string): string {
+  const d = new Date(iso + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
 export async function fetchEvents(dateFrom: string, dateTo: string): Promise<SupabaseEvent[]> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
   if (!supabaseUrl || !anonKey) return []
 
-  const cacheKey = `supabase_events_v2_${dateFrom}_${dateTo}`
+  const cacheKey = `supabase_events_v3_${dateFrom}_${dateTo}`
 
   // 1. In-memory hit
   if (memCache.has(cacheKey)) return memCache.get(cacheKey)!
@@ -55,8 +64,14 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
     Authorization: `Bearer ${anonKey}`,
   }
 
+  // event_ts boundaries in UTC for the BRT day range:
+  //   start of dateFrom 00:00 BRT = dateFrom T03:00:00Z
+  //   end of dateTo 23:59 BRT = (dateTo+1) T02:59:59Z
+  const tsFrom = `${dateFrom}T03:00:00Z`
+  const tsTo   = `${addDayISO(dateTo)}T02:59:59Z`
+
   const base = `${supabaseUrl}/rest/v1/events`
-  const qs = `select=event_type,deal_id,event_date,event_ts,email_norm,payload&event_date=gte.${dateFrom}&event_date=lte.${dateTo}`
+  const qs = `select=event_type,deal_id,event_date,event_ts,email_norm,payload&event_ts=gte.${tsFrom}&event_ts=lte.${tsTo}`
 
   const first = await fetch(`${base}?${qs}`, {
     headers: { ...headers, Range: `0-${PAGE_SIZE - 1}`, 'Range-Unit': 'items', Prefer: 'count=estimated' },
@@ -91,7 +106,7 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
 }
 
 export function invalidateSupabaseCache(dateFrom: string, dateTo: string) {
-  const key = `supabase_events_v2_${dateFrom}_${dateTo}`
+  const key = `supabase_events_v3_${dateFrom}_${dateTo}`
   memCache.delete(key)
   import('./cache').then(({ clearCacheByKey }) => clearCacheByKey(key))
 }
