@@ -25,7 +25,7 @@ import { currentMonthBRT, yesterdayBRT, getDatePresets } from '../../utils/dateB
 
 // ── Filter persistence ────────────────────────────────────────────────────────
 
-const FILTERS_KEY = 'gp_conversions_filters_v1'
+const FILTERS_KEY = 'gp_conversions_filters_v2'
 
 interface SavedFilters {
   dateFrom: string
@@ -168,13 +168,9 @@ export default function ConversionsSection({ pages }: Props) {
     if (rawEvents.length === 0 || rawEvents === lastInitedEventsRef.current) return
     lastInitedEventsRef.current = rawEvents
     const { revenue: allRevenue } = extractFilterOptions(filteredEvents)
-    const EXCLUDED = ['até 40 mil', 'até 30 mil']
-    const defaults = allRevenue.filter(
-      (r) => !EXCLUDED.some((ex) => r.toLowerCase().includes(ex)),
-    )
     revenueInitialized.current = true
     saveTo({ revenueInitialized: true })
-    setSelRevenue(defaults)
+    setSelRevenue(allRevenue)
   }, [rawEvents])
 
   // Build page name map from GreatPages data

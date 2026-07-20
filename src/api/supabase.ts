@@ -42,35 +42,36 @@ function addDayISO(iso: string): string {
 
 const SELECT = 'event_id,event_type,deal_id,event_date,event_ts,email_norm,payload'
 
-// Fetch all pages for a given querystring, returning a flat array of events.
+// Fetch all pages for a given querystring using a loop, stopping when a partial
+// page is returned. This avoids relying on count=estimated which can undercount
+// and cause later pages (with earlier-date events) to be silently skipped.
 async function fetchAllPages(
   base: string,
   qs: string,
   headers: Record<string, string>,
 ): Promise<SupabaseEvent[]> {
-  const first = await fetch(`${base}?${qs}`, {
-    headers: { ...headers, Range: `0-${PAGE_SIZE - 1}`, 'Range-Unit': 'items', Prefer: 'count=estimated' },
-  })
-  if (!first.ok) {
-    const text = await first.text()
-    throw new Error(`Supabase error ${first.status}: ${text.slice(0, 200)}`)
-  }
-  const firstData: SupabaseEvent[] = await first.json()
-  const contentRange = first.headers.get('content-range') ?? ''
-  const total = Number(contentRange.split('/')[1]) || firstData.length
-  if (total <= PAGE_SIZE) return firstData
+  const all: SupabaseEvent[] = []
+  let from = 0
 
-  const totalPages = Math.ceil(total / PAGE_SIZE)
-  const rest = await Promise.all(
-    Array.from({ length: totalPages - 1 }, (_, i) => {
-      const from = (i + 1) * PAGE_SIZE
-      const to = from + PAGE_SIZE - 1
-      return fetch(`${base}?${qs}`, {
-        headers: { ...headers, Range: `${from}-${to}`, 'Range-Unit': 'items', Prefer: 'count=none' },
-      }).then((r) => (r.ok ? (r.json() as Promise<SupabaseEvent[]>) : Promise.resolve([] as SupabaseEvent[])))
-    }),
-  )
-  return [firstData, ...rest].flat()
+  while (true) {
+    const to = from + PAGE_SIZE - 1
+    const res = await fetch(`${base}?${qs}`, {
+      headers: { ...headers, Range: `${from}-${to}`, 'Range-Unit': 'items', Prefer: 'count=none' },
+    })
+    if (!res.ok) {
+      if (from === 0) {
+        const text = await res.text()
+        throw new Error(`Supabase error ${res.status}: ${text.slice(0, 200)}`)
+      }
+      break
+    }
+    const page: SupabaseEvent[] = await res.json()
+    all.push(...page)
+    if (page.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+
+  return all
 }
 
 export async function fetchEvents(dateFrom: string, dateTo: string): Promise<SupabaseEvent[]> {
