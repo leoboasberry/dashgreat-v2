@@ -6,6 +6,7 @@ const CACHE_TTL_MINUTES = 20
 const memCache = new Map<string, SupabaseEvent[]>()
 
 export interface SupabaseEvent {
+  event_id?: string
   event_type: string
   deal_id: string
   event_date: string | null
@@ -33,12 +34,43 @@ export interface SupabaseEvent {
 const PAGE_SIZE = 1000
 
 // BRT = UTC-3 (fixed, Brazil dropped DST in 2019).
-// Filter by event_ts instead of event_date so events with event_date=null
-// (created before the column was backfilled) are still returned.
 function addDayISO(iso: string): string {
   const d = new Date(iso + 'T00:00:00Z')
   d.setUTCDate(d.getUTCDate() + 1)
   return d.toISOString().slice(0, 10)
+}
+
+const SELECT = 'event_id,event_type,deal_id,event_date,event_ts,email_norm,payload'
+
+// Fetch all pages for a given querystring, returning a flat array of events.
+async function fetchAllPages(
+  base: string,
+  qs: string,
+  headers: Record<string, string>,
+): Promise<SupabaseEvent[]> {
+  const first = await fetch(`${base}?${qs}`, {
+    headers: { ...headers, Range: `0-${PAGE_SIZE - 1}`, 'Range-Unit': 'items', Prefer: 'count=estimated' },
+  })
+  if (!first.ok) {
+    const text = await first.text()
+    throw new Error(`Supabase error ${first.status}: ${text.slice(0, 200)}`)
+  }
+  const firstData: SupabaseEvent[] = await first.json()
+  const contentRange = first.headers.get('content-range') ?? ''
+  const total = Number(contentRange.split('/')[1]) || firstData.length
+  if (total <= PAGE_SIZE) return firstData
+
+  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const rest = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, i) => {
+      const from = (i + 1) * PAGE_SIZE
+      const to = from + PAGE_SIZE - 1
+      return fetch(`${base}?${qs}`, {
+        headers: { ...headers, Range: `${from}-${to}`, 'Range-Unit': 'items', Prefer: 'count=none' },
+      }).then((r) => (r.ok ? (r.json() as Promise<SupabaseEvent[]>) : Promise.resolve([] as SupabaseEvent[])))
+    }),
+  )
+  return [firstData, ...rest].flat()
 }
 
 export async function fetchEvents(dateFrom: string, dateTo: string): Promise<SupabaseEvent[]> {
@@ -46,7 +78,7 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
   if (!supabaseUrl || !anonKey) return []
 
-  const cacheKey = `supabase_events_v4_${dateFrom}_${dateTo}`
+  const cacheKey = `supabase_events_v5_${dateFrom}_${dateTo}`
 
   // 1. In-memory hit
   if (memCache.has(cacheKey)) return memCache.get(cacheKey)!
@@ -58,50 +90,36 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
     return stored
   }
 
-  // 3. Network fetch
-  const headers = {
-    apikey: anonKey,
-    Authorization: `Bearer ${anonKey}`,
-  }
-
-  // Fetch events in range using an OR condition so both cases are covered:
-  //   1. event_date is set and falls in [dateFrom, dateTo]  (normal events)
-  //   2. event_date is null but event_ts falls in the equivalent UTC range
-  //      (events created before event_date was backfilled)
+  // 3. Network fetch — two parallel queries, merged by event_id:
+  //   Q1: event_date in [dateFrom, dateTo]   → normal events (event_date populated)
+  //   Q2: event_date IS NULL AND event_ts in BRT-equivalent UTC range
+  //       → events created before event_date was backfilled in the DB
   // BRT = UTC-3 → dateFrom 00:00 BRT = dateFrom T03:00:00Z in UTC
-  //             → dateTo   23:59 BRT = (dateTo+1) T02:59:59Z in UTC
+  //             → dateTo   23:59 BRT = next day T02:59:59Z in UTC
   const tsFrom = `${dateFrom}T03:00:00Z`
   const tsTo   = `${addDayISO(dateTo)}T02:59:59Z`
 
-  const base = `${supabaseUrl}/rest/v1/events`
-  const orFilter = `or=(and(event_date.gte.${dateFrom},event_date.lte.${dateTo}),and(event_date.is.null,event_ts.gte.${tsFrom},event_ts.lte.${tsTo}))`
-  const qs = `select=event_type,deal_id,event_date,event_ts,email_norm,payload&${orFilter}`
-
-  const first = await fetch(`${base}?${qs}`, {
-    headers: { ...headers, Range: `0-${PAGE_SIZE - 1}`, 'Range-Unit': 'items', Prefer: 'count=estimated' },
-  })
-  if (!first.ok) {
-    const text = await first.text()
-    throw new Error(`Supabase error ${first.status}: ${text.slice(0, 200)}`)
+  const headers: Record<string, string> = {
+    apikey: anonKey,
+    Authorization: `Bearer ${anonKey}`,
   }
+  const base = `${supabaseUrl}/rest/v1/events`
 
-  const firstData: SupabaseEvent[] = await first.json()
-  const contentRange = first.headers.get('content-range') ?? ''
-  const total = Number(contentRange.split('/')[1]) || firstData.length
+  const [byDate, byTs] = await Promise.all([
+    fetchAllPages(base, `select=${SELECT}&event_date=gte.${dateFrom}&event_date=lte.${dateTo}`, headers),
+    fetchAllPages(base, `select=${SELECT}&event_date=is.null&event_ts=gte.${tsFrom}&event_ts=lte.${tsTo}`, headers),
+  ])
 
-  let events = firstData
-  if (total > PAGE_SIZE) {
-    const totalPages = Math.ceil(total / PAGE_SIZE)
-    const rest = await Promise.all(
-      Array.from({ length: totalPages - 1 }, (_, i) => {
-        const from = (i + 1) * PAGE_SIZE
-        const to = from + PAGE_SIZE - 1
-        return fetch(`${base}?${qs}`, {
-          headers: { ...headers, Range: `${from}-${to}`, 'Range-Unit': 'items', Prefer: 'count=none' },
-        }).then((r) => (r.ok ? (r.json() as Promise<SupabaseEvent[]>) : Promise.resolve([] as SupabaseEvent[])))
-      }),
-    )
-    events = [firstData, ...rest].flat()
+  // Merge: deduplicate by event_id (byDate takes precedence)
+  const seen = new Set<string>()
+  const events: SupabaseEvent[] = []
+  for (const ev of [...byDate, ...byTs]) {
+    const id = ev.event_id
+    if (id) {
+      if (seen.has(id)) continue
+      seen.add(id)
+    }
+    events.push(ev)
   }
 
   setCacheEntry(cacheKey, events, CACHE_TTL_MINUTES)
@@ -110,7 +128,7 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
 }
 
 export function invalidateSupabaseCache(dateFrom: string, dateTo: string) {
-  const key = `supabase_events_v4_${dateFrom}_${dateTo}`
+  const key = `supabase_events_v5_${dateFrom}_${dateTo}`
   memCache.delete(key)
   import('./cache').then(({ clearCacheByKey }) => clearCacheByKey(key))
 }
