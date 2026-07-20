@@ -46,7 +46,7 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
   if (!supabaseUrl || !anonKey) return []
 
-  const cacheKey = `supabase_events_v3_${dateFrom}_${dateTo}`
+  const cacheKey = `supabase_events_v4_${dateFrom}_${dateTo}`
 
   // 1. In-memory hit
   if (memCache.has(cacheKey)) return memCache.get(cacheKey)!
@@ -64,14 +64,18 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
     Authorization: `Bearer ${anonKey}`,
   }
 
-  // event_ts boundaries in UTC for the BRT day range:
-  //   start of dateFrom 00:00 BRT = dateFrom T03:00:00Z
-  //   end of dateTo 23:59 BRT = (dateTo+1) T02:59:59Z
+  // Fetch events in range using an OR condition so both cases are covered:
+  //   1. event_date is set and falls in [dateFrom, dateTo]  (normal events)
+  //   2. event_date is null but event_ts falls in the equivalent UTC range
+  //      (events created before event_date was backfilled)
+  // BRT = UTC-3 → dateFrom 00:00 BRT = dateFrom T03:00:00Z in UTC
+  //             → dateTo   23:59 BRT = (dateTo+1) T02:59:59Z in UTC
   const tsFrom = `${dateFrom}T03:00:00Z`
   const tsTo   = `${addDayISO(dateTo)}T02:59:59Z`
 
   const base = `${supabaseUrl}/rest/v1/events`
-  const qs = `select=event_type,deal_id,event_date,event_ts,email_norm,payload&event_ts=gte.${tsFrom}&event_ts=lte.${tsTo}`
+  const orFilter = `or=(and(event_date.gte.${dateFrom},event_date.lte.${dateTo}),and(event_date.is.null,event_ts.gte.${tsFrom},event_ts.lte.${tsTo}))`
+  const qs = `select=event_type,deal_id,event_date,event_ts,email_norm,payload&${orFilter}`
 
   const first = await fetch(`${base}?${qs}`, {
     headers: { ...headers, Range: `0-${PAGE_SIZE - 1}`, 'Range-Unit': 'items', Prefer: 'count=estimated' },
@@ -106,7 +110,7 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
 }
 
 export function invalidateSupabaseCache(dateFrom: string, dateTo: string) {
-  const key = `supabase_events_v3_${dateFrom}_${dateTo}`
+  const key = `supabase_events_v4_${dateFrom}_${dateTo}`
   memCache.delete(key)
   import('./cache').then(({ clearCacheByKey }) => clearCacheByKey(key))
 }
