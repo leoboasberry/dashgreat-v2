@@ -4,7 +4,7 @@ import type { PageData } from '../../hooks/useDashboard'
 import type { PixelConfig, DispatchLogEntry } from '../../types/capi'
 import type { LeadEnrichment } from '../../types/capi'
 import { useCapiConfig } from '../../hooks/useCapiConfig'
-import { extractContactFields, extractFbParams } from '../../utils/audienceExport'
+import { extractContactFields, extractFbParams, extractIp } from '../../utils/audienceExport'
 import { upsertEnrichments } from '../../api/supabaseEnrichment'
 import PixelConfigModal from './PixelConfigModal'
 
@@ -54,10 +54,11 @@ function buildEnrichMap(pages: PageData[]): Record<string, LeadEnrichment> {
       if (!contact.email || map[contact.email]) continue
 
       const fb = extractFbParams(raw)
+      const ip = extractIp(raw) ?? undefined
       map[contact.email] = {
         phone: contact.phone, fn: contact.fn, ln: contact.ln,
         city: contact.city, state: contact.state, zip: contact.zip,
-        fbp: fb.fbp, fbc: fb.fbc, fbclid: fb.fbclid, leadTs,
+        fbp: fb.fbp, fbc: fb.fbc, fbclid: fb.fbclid, leadTs, ip,
       }
     }
   }

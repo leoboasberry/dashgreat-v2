@@ -55,6 +55,7 @@ interface EnrichEntry {
   fn?: string; ln?: string; phone?: string
   city?: string; state?: string; zip?: string
   fbp?: string; fbc?: string; fbclid?: string; leadTs?: number
+  ip?: string
 }
 
 async function buildUserData(email: string | null, enrich?: EnrichEntry | null) {
@@ -273,7 +274,7 @@ Deno.serve(async (req: Request) => {
       if (emailsToEnrich.length > 0) {
         const { data: enrichRows } = await sb
           .from('lead_enrichments')
-          .select('email_norm,phone,fn,ln,city,state,zip,fbp,fbc,fbclid,lead_ts')
+          .select('email_norm,phone,fn,ln,city,state,zip,fbp,fbc,fbclid,lead_ts,ip')
           .in('email_norm', emailsToEnrich)
 
         for (const r of (enrichRows ?? []) as Array<Record<string, unknown>>) {
@@ -288,6 +289,7 @@ Deno.serve(async (req: Request) => {
             fbc:     r.fbc     as string | undefined,
             fbclid:  r.fbclid  as string | undefined,
             leadTs:  r.lead_ts as number | undefined,
+            ip:      r.ip      as string | undefined,
           }
         }
       }
@@ -333,14 +335,18 @@ Deno.serve(async (req: Request) => {
           customData.value    = mrr
         }
 
-        capiEvents.push({
+        const capiEvent: Record<string, unknown> = {
           event_name:    metaName,
           event_time:    eventTs,
           event_id:      ev.event_id,
           action_source: 'system_generated',
           user_data:     userData,
           custom_data:   customData,
-        })
+        }
+        // client_ip_address and client_user_agent improve match quality (not hashed)
+        if (enrich?.ip) capiEvent.client_ip_address = enrich.ip
+
+        capiEvents.push(capiEvent)
         readyIds.push(ev.event_id as string)
       }
 

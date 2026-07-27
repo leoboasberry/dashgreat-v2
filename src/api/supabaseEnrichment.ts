@@ -23,7 +23,7 @@ export async function upsertEnrichments(
   const entries = Object.entries(enrichMap).filter(
     ([email, e]) =>
       email &&
-      (e.phone || e.fn || e.ln || e.city || e.state || e.zip || e.fbc || e.fbp || e.fbclid),
+      (e.phone || e.fn || e.ln || e.city || e.state || e.zip || e.fbc || e.fbp || e.fbclid || e.ip),
   )
   if (entries.length === 0) return
 
@@ -39,6 +39,7 @@ export async function upsertEnrichments(
     fbc:     e.fbc     ?? null,
     fbclid:  e.fbclid  ?? null,
     lead_ts: e.leadTs  ?? null,
+    ip:      e.ip      ?? null,
     updated_at: new Date().toISOString(),
   }))
 

@@ -93,6 +93,7 @@ export interface LeadEnrichment {
   fbc?: string                    // _fbc cookie value (not hashed)
   fbclid?: string                 // raw fbclid from URL param
   leadTs?: number                 // unix timestamp of lead creation
+  ip?: string                     // client_ip_address (not hashed, improves Meta matching)
 }
 
 export function defaultPixelConfig(overrides?: Partial<PixelConfig>): PixelConfig {

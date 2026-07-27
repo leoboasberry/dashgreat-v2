@@ -245,6 +245,7 @@ export function extractContactFields(raw: Record<string, string>): ContactFields
     // ── Phone ──
     if (!rawPhone && (
       k.includes('telefone') || k.includes('celular') || k.includes('whatsapp') ||
+      k.includes('telefono') ||                              // Spanish: "Número de teléfono"
       k === 'phone' || k === 'fone' || k === 'tel' || k === 'contato' ||
       k.includes('numerodotel') || k.includes('numerodocel') || k.includes('numerodewhat')
     ) && !k.includes('email')) {
@@ -262,7 +263,8 @@ export function extractContactFields(raw: Record<string, string>): ContactFields
     if (!fullName && !isEnterpriseKey(k) && (
       k.includes('nome') || k === 'name' || k === 'nomecompleto' || k === 'fullname' ||
       k === 'seunome' || k === 'seunomecompleto' || k === 'comovcseconhece' ||
-      k.includes('proprietario') || k.includes('responsavel') || k === 'dono'
+      k.includes('proprietario') || k.includes('responsavel') || k === 'dono' ||
+      k.includes('llamas') || k.includes('llamo') || k.includes('nombre')  // Spanish
     ) && !k.includes('email') && !k.includes('utm') && !k.includes('pagina')) {
       fullName = v
       continue
@@ -277,7 +279,8 @@ export function extractContactFields(raw: Record<string, string>): ContactFields
     // ── City/State combined field (e.g. "São Paulo / SP" or "SP") ──
     if (!city && (
       k.includes('cidade') || k === 'municipio' || k === 'ct' || k === 'city' ||
-      k === 'cidadeeestado' || k === 'cidadeestado' || k === 'localidade'
+      k === 'cidadeeestado' || k === 'cidadeestado' || k === 'localidade' ||
+      k.includes('ciudaddel') || k.includes('ciudaddou')    // Spanish
     )) {
       // Check for combined "City / ST" format
       const combined = v.match(/^(.+?)\s*[\/\-,]\s*([A-Z]{2})$/)
@@ -290,10 +293,11 @@ export function extractContactFields(raw: Record<string, string>): ContactFields
       continue
     }
 
-    // ── State ──
+    // ── State / Region ──
     if (!state && (
       k.includes('estado') || k === 'uf' || k === 'state' || k === 'st' ||
-      k === 'estadobr' || k === 'estadouf'
+      k === 'estadobr' || k === 'estadouf' ||
+      k.includes('regiao') || k.includes('region')          // "Região do Usuário"
     )) {
       state = normalizeState(v)
       continue
@@ -413,8 +417,31 @@ export function extractFbParams(raw: Record<string, string>): FbParams {
     if (k === 'fbp' || k === '_fbp') result.fbp = v
     else if (k === 'fbc' || k === '_fbc') result.fbc = v
     else if (k === 'fbclid') result.fbclid = v
+    else if (k === 'url' && !result.fbclid) {
+      // Parse fbclid from landing page URL if not stored as a dedicated field
+      try {
+        const url = new URL(v.startsWith('http') ? v : 'https://' + v)
+        const fbclidFromUrl = url.searchParams.get('fbclid')
+        if (fbclidFromUrl) result.fbclid = fbclidFromUrl
+      } catch {}
+    }
   }
   return result
+}
+
+/** Extracts the visitor's IP address stored by GreatPages as "IP do Usuario". */
+export function extractIp(raw: Record<string, string>): string | null {
+  for (const [key, value] of Object.entries(raw)) {
+    const k = norm(key)
+    const v = String(value ?? '').trim()
+    if (!v) continue
+    // Matches "IP do Usuario", "IP do Usuário", "User IP", "ip", etc.
+    if (k.startsWith('ip') || k === 'useip' || k === 'userip') {
+      // Must look like a valid IPv4 or IPv6 address
+      if (/^[\d.]{7,15}$/.test(v) || /^[0-9a-f:]{7,45}$/i.test(v)) return v
+    }
+  }
+  return null
 }
 
 // ── CRM stage helpers ─────────────────────────────────────────────────────────
