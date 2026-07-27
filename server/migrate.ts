@@ -3,7 +3,6 @@
  *   DATABASE_URL="postgres://..." npx tsx server/migrate.ts
  */
 
-import 'dotenv/config'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'

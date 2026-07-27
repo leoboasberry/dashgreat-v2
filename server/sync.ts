@@ -11,7 +11,7 @@ function gpHeaders() {
 }
 
 function makeLeadId(pageId: string, fields: Lead[]): string {
-  const canonical = JSON.stringify([...fields].sort((a, b) => a.id.localeCompare(b.id)))
+  const canonical = JSON.stringify([...fields].sort((a, b) => (a.id ?? '').localeCompare(b.id ?? '')))
   return createHash('sha256').update(`${pageId}:${canonical}`).digest('hex')
 }
 
@@ -51,7 +51,8 @@ export async function fetchLeadsPage(pageId: string, page: number): Promise<Lead
   )
   if (!res.ok) return []
   const data: any = await res.json()
-  return data.retorno?.paginas?.leads ?? []
+  // API returns retorno.leads (not retorno.paginas.leads)
+  return data.retorno?.leads ?? data.retorno?.paginas?.leads ?? []
 }
 
 interface LeadRow {
