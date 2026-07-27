@@ -151,6 +151,25 @@ async function sendBatch(
   }
 }
 
+// ── State normalization (full names → 2-letter BR codes) ─────────────────────
+
+const STATE_MAP: Record<string, string> = {
+  acre:'AC', alagoas:'AL', amapa:'AP', amazonas:'AM', bahia:'BA', ceara:'CE',
+  distritofederal:'DF', espiritosanto:'ES', goias:'GO', maranhao:'MA',
+  matogrosso:'MT', matogrossodosul:'MS', minasgerais:'MG', para:'PA',
+  paraiba:'PB', parana:'PR', pernambuco:'PE', piaui:'PI', riodejaneiro:'RJ',
+  riograndedonorte:'RN', riograndedosul:'RS', rondonia:'RO', roraima:'RR',
+  santacatarina:'SC', saopaulo:'SP', sergipe:'SE', tocantins:'TO',
+}
+
+function normState(raw: string): string {
+  const up = raw.toUpperCase()
+  const m = up.match(/\b(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\b/)
+  if (m) return m[1]!
+  const k = raw.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/\s+/g, '')
+  return STATE_MAP[k] ?? up.slice(0, 2)
+}
+
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
 function todayISO(): string {
@@ -303,10 +322,38 @@ Deno.serve(async (req: Request) => {
         const metaName = mapping[ev.event_type as string]
         if (!metaName) continue
 
-        const email  = ev.email_norm as string | null
-        // Priority: browser enrichData (manual dispatch) > lead_enrichments DB > null
-        const enrich = body.enrichData?.[email ?? ''] ?? dbEnrichMap[email ?? ''] ?? null
-        const deal   = ((ev.payload as Record<string, unknown>)?.deal ?? {}) as Record<string, unknown>
+        const email   = ev.email_norm as string | null
+        const pl      = (ev.payload ?? {}) as Record<string, unknown>
+        const deal    = (pl.deal ?? {}) as Record<string, unknown>
+
+        // Priority: browser enrichData > lead_enrichments DB > CRM event payload
+        const dbEnrich = body.enrichData?.[email ?? ''] ?? dbEnrichMap[email ?? ''] ?? null
+
+        // CRM payload fields — used as fallback when lead_enrichments is missing data
+        const plName    = String(pl.name    ?? '').trim()
+        const plPhone   = String(pl.phone   ?? '').trim()
+        const plCity    = String(pl.city    ?? '').trim()
+        const plState   = String(pl.state   ?? '').trim()
+        const plIp      = String(pl.ip      ?? '').trim()
+        const plFbc     = String(pl.fbc     ?? '').trim()
+        const plFbp     = String(pl.fbp     ?? '').trim()
+        const plFbclid  = String(pl.fbclid  ?? '').trim()
+        const plNameParts = plName.split(/\s+/).filter(Boolean)
+
+        // Merge: db-enrichment wins, CRM payload fills missing fields
+        const enrich: EnrichEntry = {
+          fn:     dbEnrich?.fn     ?? (plNameParts[0] || undefined),
+          ln:     dbEnrich?.ln     ?? (plNameParts.length > 1 ? plNameParts.slice(1).join(' ') : undefined),
+          phone:  (dbEnrich?.phone ?? plPhone) || undefined,
+          city:   (dbEnrich?.city  ?? plCity)  || undefined,
+          state:  dbEnrich?.state  ?? (plState ? normState(plState) : undefined),
+          zip:    dbEnrich?.zip    ?? null,
+          fbc:    (dbEnrich?.fbc   ?? plFbc)   || undefined,
+          fbp:    (dbEnrich?.fbp   ?? plFbp)   || undefined,
+          fbclid: (dbEnrich?.fbclid ?? plFbclid) || undefined,
+          leadTs: dbEnrich?.leadTs,
+          ip:     (dbEnrich?.ip    ?? plIp)    || undefined,
+        }
 
         const rawMrr = deal.potentialNewMRR
         const mrr    = (ev.event_type === 'deal_won' && rawMrr != null)
@@ -343,8 +390,7 @@ Deno.serve(async (req: Request) => {
           user_data:     userData,
           custom_data:   customData,
         }
-        // client_ip_address and client_user_agent improve match quality (not hashed)
-        if (enrich?.ip) capiEvent.client_ip_address = enrich.ip
+        if (enrich.ip) capiEvent.client_ip_address = enrich.ip
 
         capiEvents.push(capiEvent)
         readyIds.push(ev.event_id as string)
