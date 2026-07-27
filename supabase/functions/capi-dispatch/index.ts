@@ -313,6 +313,9 @@ Deno.serve(async (req: Request) => {
 
         const userData = await buildUserData(email, enrich)
 
+        // Skip if no email or phone — Meta rejects with 2804050 (no matching parameters)
+        if (!userData.em && !userData.ph) continue
+
         const nowSec  = Math.floor(Date.now() / 1000)
         const eventTs = ev.event_ts
           ? Math.floor(new Date(ev.event_ts as string).getTime() / 1000)
