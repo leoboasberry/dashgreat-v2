@@ -79,7 +79,7 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
   if (!supabaseUrl || !anonKey) return []
 
-  const cacheKey = `supabase_events_v5_${dateFrom}_${dateTo}`
+  const cacheKey = `supabase_events_v6_${dateFrom}_${dateTo}`
 
   // 1. In-memory hit
   if (memCache.has(cacheKey)) return memCache.get(cacheKey)!
@@ -107,8 +107,8 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
   const base = `${supabaseUrl}/rest/v1/events`
 
   const [byDate, byTs] = await Promise.all([
-    fetchAllPages(base, `select=${SELECT}&event_date=gte.${dateFrom}&event_date=lte.${dateTo}`, headers),
-    fetchAllPages(base, `select=${SELECT}&event_date=is.null&event_ts=gte.${tsFrom}&event_ts=lte.${tsTo}`, headers),
+    fetchAllPages(base, `select=${SELECT}&event_date=gte.${dateFrom}&event_date=lte.${dateTo}&order=event_id.asc`, headers),
+    fetchAllPages(base, `select=${SELECT}&event_date=is.null&event_ts=gte.${tsFrom}&event_ts=lte.${tsTo}&order=event_id.asc`, headers),
   ])
 
   // Merge: deduplicate by event_id (byDate takes precedence)
@@ -129,7 +129,7 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
 }
 
 export function invalidateSupabaseCache(dateFrom: string, dateTo: string) {
-  const key = `supabase_events_v5_${dateFrom}_${dateTo}`
+  const key = `supabase_events_v6_${dateFrom}_${dateTo}`
   memCache.delete(key)
   import('./cache').then(({ clearCacheByKey }) => clearCacheByKey(key))
 }
