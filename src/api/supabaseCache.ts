@@ -49,6 +49,31 @@ export async function getSupabaseCacheEntry<T>(
   }
 }
 
+/** Like getSupabaseCacheEntry but ignores TTL — stale-data fallback when API is unreachable. */
+export async function getSupabaseCacheStale<T>(
+  source: string,
+  cacheKey: string,
+): Promise<T | null> {
+  const cfg = getSupabaseConfig()
+  if (!cfg) return null
+  try {
+    const qs = new URLSearchParams({
+      source: `eq.${source}`,
+      cache_key: `eq.${cacheKey}`,
+      select: 'data',
+      limit: '1',
+    })
+    const res = await fetch(`${cfg.url}/rest/v1/api_cache?${qs}`, {
+      headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` },
+    })
+    if (!res.ok) return null
+    const rows: { data: unknown }[] = await res.json()
+    return rows.length ? (rows[0]!.data as T) : null
+  } catch {
+    return null
+  }
+}
+
 // Fire-and-forget: does not block the caller.
 // Errors are swallowed — localStorage is still populated, so the session stays fast.
 export function setSupabaseCacheEntry<T>(

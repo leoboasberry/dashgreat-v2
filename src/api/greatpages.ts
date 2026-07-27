@@ -1,6 +1,6 @@
 import type { Config, PagesListResponse, PageReportResponse, LeadsResponse } from '../types/greatpages'
 import { getCacheEntry, setCacheEntry } from './cache'
-import { getSupabaseCacheEntry, setSupabaseCacheEntry } from './supabaseCache'
+import { getSupabaseCacheEntry, setSupabaseCacheEntry, getSupabaseCacheStale } from './supabaseCache'
 
 function buildHeaders(token: string): HeadersInit {
   return {
@@ -65,7 +65,12 @@ export async function listPages(config: Config, forceRefresh = false): Promise<P
   const baseUrl = `/api/greatpages/paginas?id_usuario=${id_usuario}&id_projeto=${id_projeto}&pagina_quantidade=${PAGES_PAGE_SIZE}`
 
   const firstData = await fetchPageRetry(`${baseUrl}&pagina=1`, headers)
-  if (!firstData) throw new Error('GreatPages retornou 0 páginas após várias tentativas')
+  if (!firstData) {
+    // API unreachable — return stale Supabase cache rather than crashing the dashboard
+    const stale = await getSupabaseCacheStale<PagesListResponse>(sbSource, cacheKey)
+    if (stale) return stale
+    throw new Error('GreatPages retornou 0 páginas após várias tentativas')
+  }
 
   const total = Number(firstData.retorno?.quantidade_total ?? firstData.retorno?.quantidade ?? 0)
   let allPages = [...(firstData.retorno?.paginas ?? [])]
