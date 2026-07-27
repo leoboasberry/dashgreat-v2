@@ -11,10 +11,12 @@ const app = express()
 const PORT = process.env.PORT || 4173
 
 // ── API proxies (same targets as vite.config.ts) ─────────────────────────────
+// Note: use pathFilter (not app.use prefix) so req.url is not stripped before
+// pathRewrite sees the full path.
 
 app.use(
-  '/api/greatpages',
   createProxyMiddleware({
+    pathFilter: '/api/greatpages',
     target: 'https://api.greatpages.com.br',
     changeOrigin: true,
     pathRewrite: { '^/api/greatpages': '/v1' },
@@ -23,8 +25,8 @@ app.use(
 )
 
 app.use(
-  '/api/windsor',
   createProxyMiddleware({
+    pathFilter: '/api/windsor',
     target: 'https://connectors.windsor.ai',
     changeOrigin: true,
     pathRewrite: { '^/api/windsor': '' },
