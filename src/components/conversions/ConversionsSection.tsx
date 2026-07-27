@@ -569,6 +569,7 @@ export default function ConversionsSection({ pages }: Props) {
             loading={loading}
             loadingLeads={pages.some((p) => p.loadingLeads)}
             onOpenGoals={() => setGoalsDrawerOpen(true)}
+            dateTo={dateTo}
           />
 
           <DailyLeadsChart filteredLeads={filteredLeadsList} />

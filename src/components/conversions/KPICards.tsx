@@ -3,7 +3,6 @@ import { ArrowRight, Target } from 'lucide-react'
 import type { FunnelCounts } from '../../hooks/useConversionsData'
 import type { ChannelMetrics } from '../../utils/computeMetrics'
 import type { GoalsConfig } from '../../utils/goals'
-import { todayBRT } from '../../utils/dateBRT'
 
 function fmt(n: number) {
   return n.toLocaleString('pt-BR')
@@ -71,21 +70,22 @@ interface Props {
   loading?: boolean
   loadingLeads?: boolean
   onOpenGoals?: () => void
+  dateTo?: string
 }
 
 export default function KPICards({
   totalSpend, totalLeads, funnel, totalMRR, cpl, cpa,
   pacingDeveria, pacingBudget, byChannel = [],
   goals, loading = false, loadingLeads = false,
-  onOpenGoals,
+  onOpenGoals, dateTo,
 }: Props) {
   const [metaTooltip, setMetaTooltip] = useState(false)
   const ticketMedio = funnel.won > 0 ? totalMRR / funnel.won : null
   const ritmo = pacingDeveria && pacingDeveria > 0 ? (totalSpend / pacingDeveria) * 100 : null
 
   const goalPacingFactor = (() => {
-    const today = todayBRT()
-    const parts = today.split('-').map(Number)
+    const ref = dateTo ?? new Date().toISOString().slice(0, 10)
+    const parts = ref.split('-').map(Number)
     const year = parts[0]!, month = parts[1]!, day = parts[2]!
     const totalDays = new Date(year, month, 0).getDate()
     return Math.min(day / totalDays, 1)
