@@ -55,6 +55,7 @@ export default function App() {
   const { pages, loading, error, cacheAgeSeconds, lastRefreshed, refresh } = useDashboard(
     config && authenticated ? config : null,
   )
+  const hideHeader = localStorage.getItem('__h') === '1'
 
   function handleFirstSetup(c: Config, hash: string) {
     clearAllCache()
@@ -131,8 +132,8 @@ export default function App() {
       <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
         <div className="px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/berry-logo.png" alt="Berry" className="h-8 w-auto object-contain" />
-            <span className="text-[10px] text-gray-400 font-medium tracking-wide">Controle Geral Performance Berry - Consultoria</span>
+            {!hideHeader && <img src="/berry-logo.png" alt="Berry" className="h-8 w-auto object-contain" />}
+            {!hideHeader && <span className="text-[10px] text-gray-400 font-medium tracking-wide">Controle Geral Performance Berry - Consultoria</span>}
           </div>
 
           <div className="flex items-center gap-2">
