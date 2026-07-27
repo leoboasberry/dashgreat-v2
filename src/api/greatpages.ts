@@ -168,7 +168,20 @@ export async function getPageLeads(
     }
   }
 
-  // 3. GreatPages API
+  // 3. Mirror (Railway PostgreSQL) — preferred source; no GreatPages quota used
+  try {
+    const mirrorRes = await fetch(`/mirror/leads?page_id=${pageId}`)
+    if (mirrorRes.ok) {
+      const mirrorData: LeadsResponse = await mirrorRes.json()
+      setCacheEntry(cacheKey, mirrorData, cacheTtlMinutes)
+      setSupabaseCacheEntry(sbSource, cacheKey, mirrorData, ttlSeconds)
+      return mirrorData
+    }
+  } catch {
+    // mirror unavailable (e.g. local dev with vite) — fall through to GreatPages
+  }
+
+  // 4. GreatPages API (fallback when mirror is unreachable)
   const headers = buildHeaders(token)
   const baseUrl = `/api/greatpages/paginas/${pageId}/leads?id_usuario=${id_usuario}&id_projeto=${id_projeto}&pagina_ordenacao=DESC&pagina_quantidade=${LEADS_PAGE_SIZE}`
 
@@ -177,7 +190,9 @@ export async function getPageLeads(
   const first: LeadsResponse = await firstRes.json()
 
   const total = Number(first.retorno?.quantidade_total ?? 0)
-  const allLeads = [...(first.retorno?.paginas?.leads ?? [])]
+  const allLeads = [
+    ...(first.retorno?.paginas?.leads ?? (first.retorno as any)?.leads ?? []),
+  ]
 
   if (total > LEADS_PAGE_SIZE && allLeads.length < LEADS_MAX_CAP) {
     const totalPages = Math.ceil(Math.min(total, LEADS_MAX_CAP) / LEADS_PAGE_SIZE)
@@ -189,7 +204,9 @@ export async function getPageLeads(
     )
     for (const r of rest) {
       if (r.status === 'fulfilled' && r.value) {
-        allLeads.push(...(r.value.retorno?.paginas?.leads ?? []))
+        allLeads.push(
+          ...(r.value.retorno?.paginas?.leads ?? (r.value.retorno as any)?.leads ?? []),
+        )
       }
     }
   }
