@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { RefreshCw, Loader2, AlertCircle, Info, ChevronDown, ChevronUp } from 'lucide-react'
+import { RefreshCw, Loader2, AlertCircle, Info, ChevronDown, ChevronUp, Download } from 'lucide-react'
 import { useConversionsData } from '../../hooks/useConversionsData'
 import { CHANNELS, normalizeCrmChannel } from '../../utils/channelNorm'
 import { parseAllLeads, filterLeads } from '../../utils/parseLeads'
@@ -301,6 +301,123 @@ export default function ConversionsSection({ pages }: Props) {
   const missingWindsor = !import.meta.env.VITE_WINDSOR_API_KEY
   const missingSupabase = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY
 
+  function downloadJson() {
+    const payload = {
+      exportadoEm: new Date().toISOString(),
+      _descricao: 'Exportação completa da tela de Conversões — use os campos abaixo para análise de funil, investimento e performance de mídia.',
+      periodo: {
+        de: dateFrom,
+        ate: dateTo,
+      },
+      filtrosAplicados: {
+        canais: activeChannels.length > 0 ? activeChannels : 'todos',
+        campanhas: selCampaigns.length > 0 ? selCampaigns : 'todas',
+        conjuntos: selAdSets.length > 0 ? selAdSets : 'todos',
+        anuncios: selAds.length > 0 ? selAds : 'todos',
+        landingPages: selPages.length > 0 ? selPages.map(id => pageNameMap.get(id) ?? id) : 'todas',
+        faturamentos: selRevenue.length > 0 ? selRevenue : 'todos',
+        segmentos: selSegments.length > 0 ? selSegments : 'todos',
+        apenasAtivos: onlyActive,
+        campanhasExcluidas: excludedCampaigns,
+        utmCampanhasExcluidas: excludedUtms,
+      },
+      kpisTotais: {
+        investimentoTotalBRL: totalSpend,
+        mrrTotalBRL: totalMRR,
+        cpmqlBRL: filteredCpmql,
+        cpaBRL: filteredCpa,
+        leadsGreatPages: totalLeads,
+        pacing: {
+          deviaBRL: pacingDeveria,
+          orcamentoBRL: pacingBudget,
+        },
+      },
+      funil: {
+        mqls: funnelCounts.mql,
+        sqls: funnelCounts.sql,
+        oportunidades: funnelCounts.opportunity,
+        reunioes: funnelCounts.meeting,
+        fechamentos: funnelCounts.won,
+        taxaMqlParaSql: funnelCounts.mql > 0 ? +(funnelCounts.sql / funnelCounts.mql * 100).toFixed(1) : null,
+        taxaSqlParaOportunidade: funnelCounts.sql > 0 ? +(funnelCounts.opportunity / funnelCounts.sql * 100).toFixed(1) : null,
+        taxaOportunidadeParaFechamento: funnelCounts.opportunity > 0 ? +(funnelCounts.won / funnelCounts.opportunity * 100).toFixed(1) : null,
+        taxaMqlParaFechamento: funnelCounts.mql > 0 ? +(funnelCounts.won / funnelCounts.mql * 100).toFixed(1) : null,
+      },
+      porCanal: byChannel.map(c => ({
+        canal: c.channel,
+        investimentoBRL: c.spend,
+        orcamentoDiarioBRL: c.activeSpend,
+        mqls: c.mqls,
+        sqls: c.sqls,
+        oportunidades: c.opportunities,
+        reunioes: c.meetings,
+        fechamentos: c.won,
+        mrrBRL: c.mrr,
+        cpmqlBRL: c.mqls > 0 && c.spend > 0 ? +(c.spend / c.mqls).toFixed(2) : null,
+        cpaBRL: c.won > 0 ? +(c.spend / c.won).toFixed(2) : null,
+      })),
+      porCampanha: byCampaign.map(c => ({
+        codigoCampanha: c.campaign,
+        nomeCompleto: c.campaignFullName ?? null,
+        status: c.status ?? null,
+        investimentoBRL: c.spend,
+        orcamentoDiarioBRL: c.dailyBudget,
+        mqls: c.mqls,
+        sqls: c.sqls,
+        oportunidades: c.opportunities,
+        reunioes: c.meetings,
+        fechamentos: c.won,
+        mrrBRL: c.mrr,
+        cpmqlBRL: c.mqls > 0 && c.spend > 0 ? +(c.spend / c.mqls).toFixed(2) : null,
+        cpaBRL: c.won > 0 ? +(c.spend / c.won).toFixed(2) : null,
+      })),
+      porConjunto: byAdSet.map(a => ({
+        codigoConjunto: a.adSet,
+        nomeCompleto: a.adSetFullName ?? null,
+        status: a.status ?? null,
+        investimentoBRL: a.spend,
+        orcamentoDiarioBRL: a.dailyBudget,
+        mqls: a.mqls,
+        sqls: a.sqls,
+        oportunidades: a.opportunities,
+        reunioes: a.meetings,
+        fechamentos: a.won,
+        mrrBRL: a.mrr,
+        cpmqlBRL: a.mqls > 0 && a.spend > 0 ? +(a.spend / a.mqls).toFixed(2) : null,
+        cpaBRL: a.won > 0 ? +(a.spend / a.won).toFixed(2) : null,
+      })),
+      porAnuncio: byAd.map(a => ({
+        codigoAnuncio: a.ad,
+        nomeCompleto: a.adFullName ?? null,
+        status: a.status ?? null,
+        investimentoBRL: a.spend,
+        mqls: a.mqls,
+        sqls: a.sqls,
+        oportunidades: a.opportunities,
+        reunioes: a.meetings,
+        fechamentos: a.won,
+        mrrBRL: a.mrr,
+        cpmqlBRL: a.mqls > 0 && a.spend > 0 ? +(a.spend / a.mqls).toFixed(2) : null,
+        cpaBRL: a.won > 0 ? +(a.spend / a.won).toFixed(2) : null,
+      })),
+      serieDiariaInvestimento: dailySpend,
+      serieDiariaFunil: dailyFunnel,
+      leadsGreatPages: filteredLeadsList,
+      eventosCRM: filteredEvents,
+      dadosBrutosWindsor: filteredWindsorRows,
+    }
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `conversoes_${dateFrom}_${dateTo}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="flex flex-col gap-5">
       {/* Config warnings */}
@@ -404,7 +521,7 @@ export default function ConversionsSection({ pages }: Props) {
                   {label}
                 </button>
               ))}
-              <div className="ml-auto shrink-0">
+              <div className="ml-auto shrink-0 flex items-center gap-1">
                 <button
                   onClick={(e) => { e.stopPropagation(); reload() }}
                   disabled={loading}
@@ -412,6 +529,13 @@ export default function ConversionsSection({ pages }: Props) {
                 >
                   <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
                   <span className="hidden sm:inline">Atualizar</span>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); downloadJson() }}
+                  title="Exportar dados para IA (JSON)"
+                  className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <Download size={13} />
                 </button>
               </div>
             </div>
