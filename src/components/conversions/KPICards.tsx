@@ -70,7 +70,7 @@ interface Props {
   loading?: boolean
   loadingLeads?: boolean
   onOpenGoals?: () => void
-  onDownloadDeals?: () => void
+  onDownloadStage?: (eventType: string) => void
   dateTo?: string
 }
 
@@ -78,7 +78,7 @@ export default function KPICards({
   totalSpend, totalLeads, funnel, totalMRR, cpl, cpa,
   pacingDeveria, pacingBudget, byChannel = [],
   goals, loading = false, loadingLeads = false,
-  onOpenGoals, onDownloadDeals, dateTo,
+  onOpenGoals, onDownloadStage, dateTo,
 }: Props) {
   const [metaTooltip, setMetaTooltip] = useState(false)
   const ticketMedio = funnel.won > 0 ? totalMRR / funnel.won : null
@@ -93,12 +93,12 @@ export default function KPICards({
   })()
 
   const stages = [
-    { label: 'Leads',         value: totalLeads,         loadingState: loadingLeads, goalKey: null as keyof GoalsConfig | null },
-    { label: 'MQLs',          value: funnel.mql,         loadingState: loading,      goalKey: 'mqls' as keyof GoalsConfig },
-    { label: 'SQLs',          value: funnel.sql,         loadingState: loading,      goalKey: 'sqls' as keyof GoalsConfig },
-    { label: 'Oportunidades', value: funnel.opportunity, loadingState: loading,      goalKey: 'opportunities' as keyof GoalsConfig },
-    { label: 'Reuniões',      value: funnel.meeting,     loadingState: loading,      goalKey: 'meetings' as keyof GoalsConfig },
-    { label: 'Ganhos',        value: funnel.won,         loadingState: loading,      goalKey: 'won' as keyof GoalsConfig },
+    { label: 'Leads',         value: totalLeads,         loadingState: loadingLeads, goalKey: null as keyof GoalsConfig | null, eventType: '' },
+    { label: 'MQLs',          value: funnel.mql,         loadingState: loading,      goalKey: 'mqls' as keyof GoalsConfig,         eventType: 'mql' },
+    { label: 'SQLs',          value: funnel.sql,         loadingState: loading,      goalKey: 'sqls' as keyof GoalsConfig,         eventType: 'sql' },
+    { label: 'Oportunidades', value: funnel.opportunity, loadingState: loading,      goalKey: 'opportunities' as keyof GoalsConfig, eventType: 'opportunity' },
+    { label: 'Reuniões',      value: funnel.meeting,     loadingState: loading,      goalKey: 'meetings' as keyof GoalsConfig,      eventType: 'meeting_completed' },
+    { label: 'Ganhos',        value: funnel.won,         loadingState: loading,      goalKey: 'won' as keyof GoalsConfig,          eventType: 'deal_won' },
   ]
 
   const cpmqlGoal = goals?.cpmql ?? 0
@@ -300,28 +300,16 @@ export default function KPICards({
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
         <div className="flex items-center justify-between mb-4">
           <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Funil de Conversão</span>
-          <div className="flex items-center gap-1">
-            {onDownloadDeals && (
-              <button
-                onClick={onDownloadDeals}
-                className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-600 hover:bg-gray-100 px-2 py-1 rounded-lg transition-colors"
-                title="Baixar deals do funil (CSV)"
-              >
-                <FileDown size={11} />
-                <span>CSV</span>
-              </button>
-            )}
-            {onOpenGoals && (
-              <button
-                onClick={onOpenGoals}
-                className="flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-[#0D2F9F] hover:bg-blue-50 px-2.5 py-1 rounded-lg transition-colors border border-transparent hover:border-blue-100"
-                title="Configurar metas"
-              >
-                <Target size={11} />
-                <span>Metas</span>
-              </button>
-            )}
-          </div>
+          {onOpenGoals && (
+            <button
+              onClick={onOpenGoals}
+              className="flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-[#0D2F9F] hover:bg-blue-50 px-2.5 py-1 rounded-lg transition-colors border border-transparent hover:border-blue-100"
+              title="Configurar metas"
+            >
+              <Target size={11} />
+              <span>Metas</span>
+            </button>
+          )}
         </div>
 
         <div className="flex items-center w-full py-2">
@@ -356,6 +344,15 @@ export default function KPICards({
                   </div>
                   {!stage.loadingState && goal > 0 && (
                     <GoalBadge value={stage.value} goal={goal} pacingFactor={goalPacingFactor} />
+                  )}
+                  {!stage.loadingState && stage.eventType && stage.value > 0 && onDownloadStage && (
+                    <button
+                      onClick={() => onDownloadStage(stage.eventType)}
+                      title={`Baixar ${stage.label} (CSV)`}
+                      className="p-0.5 text-gray-300 hover:text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                    >
+                      <FileDown size={11} />
+                    </button>
                   )}
                 </div>
               </Fragment>
