@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { RefreshCw, Loader2, AlertCircle, Info, ChevronDown, ChevronUp, Download } from 'lucide-react'
 import { useConversionsData } from '../../hooks/useConversionsData'
 import { CHANNELS, normalizeCrmChannel } from '../../utils/channelNorm'
-import { parseAllLeads, filterLeads } from '../../utils/parseLeads'
+import { parseAllLeads, filterLeads, parseCampaign } from '../../utils/parseLeads'
 import { computeMetrics, extractFilterOptions } from '../../utils/computeMetrics'
 import type { PageData } from '../../hooks/useDashboard'
 import { useCeaConfig } from '../../hooks/useCeaConfig'
@@ -300,6 +300,133 @@ export default function ConversionsSection({ pages }: Props) {
 
   const missingWindsor = !import.meta.env.VITE_WINDSOR_API_KEY
   const missingSupabase = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY
+
+  function downloadDealsCsv() {
+    // Replicate the same filtering logic that computeMetrics applies internally,
+    // so the CSV rows match exactly the funnel numbers on screen.
+
+    // Build deal→channel map (same as computeMetrics)
+    const dealChannels = new Map<string, string>()
+    for (const ev of filteredEvents) {
+      if (!ev.deal_id || dealChannels.has(ev.deal_id)) continue
+      dealChannels.set(ev.deal_id, normalizeCrmChannel(ev.payload?.deal?.platform, ev.payload?.utmSource))
+    }
+
+    const hasCampaignFilters = selCampaigns.length > 0 || selAdSets.length > 0 || selAds.length > 0
+    const evRevenue = (ev: typeof filteredEvents[0]) =>
+      ev.payload?.deal?.revenueNormalization?.normalizedValue ??
+      ev.payload?.deal?.revenue ?? ev.payload?.revenue ?? ''
+    const evPagina = (ev: typeof filteredEvents[0]) =>
+      ev.payload?.deal?.pagina ?? ev.payload?.pagina ?? ''
+    const evSegment = (ev: typeof filteredEvents[0]) =>
+      ev.payload?.deal?.segment ?? ev.payload?.segment ?? ''
+
+    let events = filteredEvents
+
+    if (hasCampaignFilters) {
+      events = events.filter(ev => {
+        const { campaign, adSet, ad } = parseCampaign(ev.payload?.deal?.utmCampaign ?? ev.payload?.utmCampaign)
+        if (selCampaigns.length > 0 && !selCampaigns.includes(campaign)) return false
+        if (selAdSets.length > 0 && !selAdSets.includes(adSet)) return false
+        if (selAds.length > 0 && !selAds.includes(ad)) return false
+        return true
+      })
+    }
+    if (selPages.length > 0) {
+      events = events.filter(ev => selPages.includes(evPagina(ev)))
+    }
+    if (selRevenue.length > 0) {
+      events = events.filter(ev => { const r = evRevenue(ev); return !r || selRevenue.includes(r) })
+    }
+    if (selSegments.length > 0) {
+      events = events.filter(ev => selSegments.includes(evSegment(ev)))
+    }
+    if (activeChannels.length > 0) {
+      events = events.filter(ev => {
+        if (!ev.deal_id) return false
+        return activeChannels.includes(dealChannels.get(ev.deal_id) ?? 'Outras Origens')
+      })
+    }
+
+    // Funnel stage order (lowest → highest)
+    const STAGE_ORDER = ['mql', 'sql', 'opportunity', 'meeting_completed', 'deal_won'] as const
+    const STAGE_LABEL: Record<string, string> = {
+      mql: 'MQL', sql: 'SQL', opportunity: 'Oportunidade',
+      meeting_completed: 'Reunião', deal_won: 'Ganho',
+    }
+
+    // Group by deal_id
+    type DealRow = {
+      email: string; canal: string; utmCampaign: string
+      campanha: string; conjunto: string; anuncio: string
+      landingPage: string; faturamento: string; segmento: string; mrr: number
+      stages: Partial<Record<typeof STAGE_ORDER[number], string>>
+    }
+    const dealMap = new Map<string, DealRow>()
+
+    for (const ev of events) {
+      if (!ev.deal_id) continue
+      if (!dealMap.has(ev.deal_id)) {
+        const utmCampaign = ev.payload?.deal?.utmCampaign ?? ev.payload?.utmCampaign ?? ''
+        const { campaign, adSet, ad } = parseCampaign(utmCampaign)
+        dealMap.set(ev.deal_id, {
+          email: ev.email_norm ?? '',
+          canal: dealChannels.get(ev.deal_id) ?? 'Outras Origens',
+          utmCampaign,
+          campanha: campaign,
+          conjunto: adSet !== campaign ? adSet : '',
+          anuncio: ad !== adSet ? ad : '',
+          landingPage: evPagina(ev),
+          faturamento: evRevenue(ev),
+          segmento: evSegment(ev),
+          mrr: 0,
+          stages: {},
+        })
+      }
+      const row = dealMap.get(ev.deal_id)!
+      if ((STAGE_ORDER as readonly string[]).includes(ev.event_type)) {
+        const stage = ev.event_type as typeof STAGE_ORDER[number]
+        const date = ev.event_date ?? (ev.event_ts ? ev.event_ts.slice(0, 10) : '')
+        if (date && !row.stages[stage]) row.stages[stage] = date
+      }
+      if (ev.event_type === 'deal_won' && !row.mrr) {
+        row.mrr = Number(ev.payload?.deal?.potentialNewMRR) || 0
+      }
+    }
+
+    // Build CSV
+    const headers = [
+      'deal_id', 'email', 'canal', 'etapa_mais_avancada',
+      'data_mql', 'data_sql', 'data_oportunidade', 'data_reuniao', 'data_ganho',
+      'mrr_brl', 'utm_campaign', 'campanha', 'conjunto', 'anuncio',
+      'landing_page', 'faturamento', 'segmento',
+    ]
+    const q = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`
+
+    const rows = [...dealMap.entries()].map(([dealId, d]) => {
+      const highest = [...STAGE_ORDER].reverse().find(s => d.stages[s]) ?? ''
+      return [
+        dealId, d.email, d.canal,
+        highest ? (STAGE_LABEL[highest] ?? highest) : '',
+        d.stages.mql ?? '', d.stages.sql ?? '',
+        d.stages.opportunity ?? '', d.stages.meeting_completed ?? '', d.stages.deal_won ?? '',
+        d.mrr || '', d.utmCampaign,
+        d.campanha, d.conjunto, d.anuncio,
+        d.landingPage, d.faturamento, d.segmento,
+      ].map(q).join(',')
+    })
+
+    const csv = '﻿' + [headers.map(q).join(','), ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `deals_funil_${dateFrom}_${dateTo}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 
   function downloadJson() {
     const payload = {
@@ -693,6 +820,7 @@ export default function ConversionsSection({ pages }: Props) {
             loading={loading}
             loadingLeads={pages.some((p) => p.loadingLeads)}
             onOpenGoals={() => setGoalsDrawerOpen(true)}
+            onDownloadDeals={downloadDealsCsv}
             dateTo={dateTo}
           />
 

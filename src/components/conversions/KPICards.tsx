@@ -1,5 +1,5 @@
 import { useState, Fragment } from 'react'
-import { ArrowRight, Target } from 'lucide-react'
+import { ArrowRight, Target, FileDown } from 'lucide-react'
 import type { FunnelCounts } from '../../hooks/useConversionsData'
 import type { ChannelMetrics } from '../../utils/computeMetrics'
 import type { GoalsConfig } from '../../utils/goals'
@@ -70,6 +70,7 @@ interface Props {
   loading?: boolean
   loadingLeads?: boolean
   onOpenGoals?: () => void
+  onDownloadDeals?: () => void
   dateTo?: string
 }
 
@@ -77,7 +78,7 @@ export default function KPICards({
   totalSpend, totalLeads, funnel, totalMRR, cpl, cpa,
   pacingDeveria, pacingBudget, byChannel = [],
   goals, loading = false, loadingLeads = false,
-  onOpenGoals, dateTo,
+  onOpenGoals, onDownloadDeals, dateTo,
 }: Props) {
   const [metaTooltip, setMetaTooltip] = useState(false)
   const ticketMedio = funnel.won > 0 ? totalMRR / funnel.won : null
@@ -299,16 +300,28 @@ export default function KPICards({
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
         <div className="flex items-center justify-between mb-4">
           <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Funil de Conversão</span>
-          {onOpenGoals && (
-            <button
-              onClick={onOpenGoals}
-              className="flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-[#0D2F9F] hover:bg-blue-50 px-2.5 py-1 rounded-lg transition-colors border border-transparent hover:border-blue-100"
-              title="Configurar metas"
-            >
-              <Target size={11} />
-              <span>Metas</span>
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {onDownloadDeals && (
+              <button
+                onClick={onDownloadDeals}
+                className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-600 hover:bg-gray-100 px-2 py-1 rounded-lg transition-colors"
+                title="Baixar deals do funil (CSV)"
+              >
+                <FileDown size={11} />
+                <span>CSV</span>
+              </button>
+            )}
+            {onOpenGoals && (
+              <button
+                onClick={onOpenGoals}
+                className="flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-[#0D2F9F] hover:bg-blue-50 px-2.5 py-1 rounded-lg transition-colors border border-transparent hover:border-blue-100"
+                title="Configurar metas"
+              >
+                <Target size={11} />
+                <span>Metas</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center w-full py-2">
