@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { yesterdayBRT } from '../../utils/dateBRT'
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, X, List } from 'lucide-react'
 import {
@@ -202,10 +202,21 @@ type MetricKey = 'mqls' | 'cpmql' | 'leads'
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+  return isMobile
+}
+
 export default function DailyFunnelChart({ dailyFunnel, filteredLeads, mqlEventsByDate, dateFrom, dateTo }: Props) {
   const [collapsed, setCollapsed] = useState(false)
   const [active, setActive] = useState<Set<MetricKey>>(new Set(['mqls', 'cpmql']))
   const [modalDay, setModalDay] = useState<string | null>(null)
+  const isMobile = useIsMobile()
 
   function toggle(key: MetricKey) {
     setActive((prev) => {
@@ -364,10 +375,10 @@ export default function DailyFunnelChart({ dailyFunnel, filteredLeads, mqlEvents
         {/* Chart body */}
         {!collapsed && (
           <div className="px-2 pb-2">
-            <ResponsiveContainer width="100%" height={240}>
+            <ResponsiveContainer width="100%" height={isMobile ? 180 : 240}>
               <ComposedChart
                 data={data}
-                margin={{ top: 8, right: showRightAxis ? 16 : 8, left: 0, bottom: 0 }}
+                margin={{ top: isMobile ? 4 : 8, right: showRightAxis ? (isMobile ? 36 : 16) : 8, left: 0, bottom: 0 }}
                 onClick={(chartData) => {
                   const date = chartData?.activeLabel as string | undefined
                   if (date) openDay(date)
@@ -378,28 +389,29 @@ export default function DailyFunnelChart({ dailyFunnel, filteredLeads, mqlEvents
                 <XAxis
                   dataKey="date"
                   tickFormatter={fmtDate}
-                  tick={{ fontSize: 11, fill: '#94a3b8' }}
+                  tick={{ fontSize: isMobile ? 10 : 11, fill: '#94a3b8' }}
                   axisLine={false}
                   tickLine={false}
+                  interval={isMobile ? 'preserveStartEnd' : 0}
                 />
                 {showLeftAxis && (
                   <YAxis
                     yAxisId="count"
-                    tick={{ fontSize: 11, fill: '#94a3b8' }}
+                    tick={{ fontSize: isMobile ? 10 : 11, fill: '#94a3b8' }}
                     axisLine={false}
                     tickLine={false}
-                    width={32}
+                    width={isMobile ? 24 : 32}
                   />
                 )}
                 {showRightAxis && (
                   <YAxis
                     yAxisId="cost"
                     orientation="right"
-                    tick={{ fontSize: 11, fill: '#94a3b8' }}
+                    tick={{ fontSize: isMobile ? 10 : 11, fill: '#94a3b8' }}
                     tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`}
                     axisLine={false}
                     tickLine={false}
-                    width={48}
+                    width={isMobile ? 36 : 48}
                   />
                 )}
                 <Tooltip
@@ -427,11 +439,11 @@ export default function DailyFunnelChart({ dailyFunnel, filteredLeads, mqlEvents
                     name="Leads"
                     stroke="#0D2F9F"
                     strokeWidth={2}
-                    dot={{ r: 2.5, fill: '#0D2F9F', strokeWidth: 0 }}
+                    dot={{ r: isMobile ? 2 : 2.5, fill: '#0D2F9F', strokeWidth: 0 }}
                     activeDot={{ r: 4 }}
                     connectNulls={false}
                   >
-                    <LabelList dataKey="leads" position="top" style={{ fontSize: 11, fill: '#818cf8' }} />
+                    {!isMobile && <LabelList dataKey="leads" position="top" style={{ fontSize: 11, fill: '#818cf8' }} />}
                   </Line>
                 )}
 
@@ -443,11 +455,11 @@ export default function DailyFunnelChart({ dailyFunnel, filteredLeads, mqlEvents
                     name="MQLs"
                     stroke="#0D2F9F"
                     strokeWidth={2}
-                    dot={{ r: 2.5, fill: '#0D2F9F', strokeWidth: 0 }}
+                    dot={{ r: isMobile ? 2 : 2.5, fill: '#0D2F9F', strokeWidth: 0 }}
                     activeDot={{ r: 4 }}
                     connectNulls={false}
                   >
-                    <LabelList dataKey="mqls" position="top" style={{ fontSize: 11, fill: '#4b7cf7' }} />
+                    {!isMobile && <LabelList dataKey="mqls" position="top" style={{ fontSize: 11, fill: '#4b7cf7' }} />}
                   </Line>
                 )}
 
@@ -460,16 +472,18 @@ export default function DailyFunnelChart({ dailyFunnel, filteredLeads, mqlEvents
                     stroke="#f59e0b"
                     strokeWidth={1.5}
                     strokeDasharray="4 3"
-                    dot={{ r: 2, fill: '#f59e0b', strokeWidth: 0 }}
+                    dot={{ r: isMobile ? 2 : 2, fill: '#f59e0b', strokeWidth: 0 }}
                     activeDot={{ r: 4 }}
                     connectNulls={false}
                   >
-                    <LabelList
-                      dataKey="cpmql"
-                      position="top"
-                      formatter={(v: number) => `${parseFloat((v / 1000).toFixed(2))}k`}
-                      style={{ fontSize: 11, fill: '#d97706' }}
-                    />
+                    {!isMobile && (
+                      <LabelList
+                        dataKey="cpmql"
+                        position="top"
+                        formatter={(v: number) => `${parseFloat((v / 1000).toFixed(2))}k`}
+                        style={{ fontSize: 11, fill: '#d97706' }}
+                      />
+                    )}
                   </Line>
                 )}
               </ComposedChart>
@@ -485,8 +499,8 @@ export default function DailyFunnelChart({ dailyFunnel, filteredLeads, mqlEvents
             { label: 'Lead → MQL', value: trend.leadToMql, positiveGood: true },
           ]
           return (
-            <div className="flex items-center border-t border-gray-100 divide-x divide-gray-100">
-              <span className="px-5 py-4 text-xs text-gray-400 font-medium shrink-0 whitespace-nowrap">
+            <div className="flex flex-wrap items-center border-t border-gray-100 sm:divide-x sm:divide-gray-100">
+              <span className="w-full sm:w-auto px-4 sm:px-5 pt-3 pb-1 sm:py-4 text-xs text-gray-400 font-medium shrink-0 whitespace-nowrap">
                 Tendência 7d
               </span>
               {items.map(({ label, value, positiveGood }) => {
@@ -515,7 +529,7 @@ export default function DailyFunnelChart({ dailyFunnel, filteredLeads, mqlEvents
                 const Icon = !hasData ? Minus : isUp ? TrendingUp : isDown ? TrendingDown : Minus
 
                 return (
-                  <div key={label} className="flex items-center gap-3 px-5 py-4 flex-1 min-w-0">
+                  <div key={label} className="flex items-center gap-3 px-4 sm:px-5 pb-3 sm:py-4 flex-1 min-w-0">
                     <div>
                       <p className="text-xs text-gray-400 mb-0.5">{label}</p>
                       <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${bgClass}`}>

@@ -29,6 +29,7 @@ export interface WindsorRow {
   video_p75_watched_actions_video_view?: number | null
   video_p100_watched_actions_video_view?: number | null
   video_thruplay_watched_actions_video_view?: number | null
+  account?: 'principal' | 'lab' | 'google' | 'bing' | 'linkedin' | 'tiktok' | 'openai'
 }
 
 const WINDSOR_FIELDS = [

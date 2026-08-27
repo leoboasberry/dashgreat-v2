@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { yesterdayBRT } from '../../utils/dateBRT'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import {
   BarChart,
   Bar,
   LabelList,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -58,8 +60,19 @@ interface Props {
   dateTo: string
 }
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+  return isMobile
+}
+
 export default function InvestmentChart({ data, activeChannels, dateFrom, dateTo }: Props) {
   const [collapsed, setCollapsed] = useState(false)
+  const isMobile = useIsMobile()
 
   const visibleChannels = (activeChannels.length > 0 ? activeChannels : CHANNELS) as Channel[]
   const activeData = visibleChannels.filter((ch) => data.some((d) => (d[ch] as number) > 0))
@@ -103,73 +116,108 @@ export default function InvestmentChart({ data, activeChannels, dateFrom, dateTo
             <p className="text-sm text-gray-400 text-center py-10 px-5">Sem dados de investimento no período.</p>
           ) : (
             <div className="px-2 pb-2">
-              {/* Enrich data with daily total for label */}
-              {(() => {
-                const enriched = data.map((d) => ({
-                  ...d,
-                  _total: activeData.reduce((s, ch) => s + (Number(d[ch]) || 0), 0),
-                }))
-                return (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={enriched} margin={{ top: 20, right: 16, left: 0, bottom: 0 }} maxBarSize={32}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={fmtDate}
-                        tick={{ fontSize: 11, fill: '#94a3b8' }}
-                        axisLine={false}
-                        tickLine={false}
-                        interval="preserveStartEnd"
+              {isMobile ? (
+                /* Mobile: linha por canal, sem labels sobrepostos */
+                <ResponsiveContainer width="100%" height={160}>
+                  <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={fmtDate}
+                      tick={{ fontSize: 11, fill: '#94a3b8' }}
+                      axisLine={false}
+                      tickLine={false}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis
+                      tickFormatter={(v: number) => `R$${(v / 1000).toFixed(0)}k`}
+                      tick={{ fontSize: 11, fill: '#94a3b8' }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={44}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 6, color: '#94a3b8' }} />
+                    {activeData.map((ch) => (
+                      <Line
+                        key={ch}
+                        dataKey={ch}
+                        stroke={CHANNEL_COLORS[ch]}
+                        name={ch}
+                        dot={false}
+                        strokeWidth={2}
                       />
-                      <YAxis
-                        tickFormatter={(v: number) => `R$${(v / 1000).toFixed(0)}k`}
-                        tick={{ fontSize: 11, fill: '#94a3b8' }}
-                        axisLine={false}
-                        tickLine={false}
-                        width={48}
-                      />
-                      <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
-                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 6, color: '#94a3b8' }} />
-                      {activeData.map((ch, idx) => (
-                        <Bar
-                          key={ch}
-                          dataKey={ch}
-                          stackId="invest"
-                          fill={CHANNEL_COLORS[ch]}
-                          name={ch}
-                          radius={idx === activeData.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
-                        >
-                          {/* Label only on the topmost bar */}
-                          {idx === activeData.length - 1 && (
-                            <LabelList
-                              dataKey="_total"
-                              position="top"
-                              formatter={(v: number) => v > 0 ? `R$${(v / 1000).toFixed(0)}k` : ''}
-                              style={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }}
-                            />
-                          )}
-                        </Bar>
-                      ))}
-                    </BarChart>
-                  </ResponsiveContainer>
-                )
-              })()}
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                /* Desktop: barras empilhadas com label total */
+                (() => {
+                  const enriched = data.map((d) => ({
+                    ...d,
+                    _total: activeData.reduce((s, ch) => s + (Number(d[ch]) || 0), 0),
+                  }))
+                  return (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={enriched} margin={{ top: 20, right: 8, left: 0, bottom: 0 }} maxBarSize={32}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis
+                          dataKey="date"
+                          tickFormatter={fmtDate}
+                          tick={{ fontSize: 11, fill: '#94a3b8' }}
+                          axisLine={false}
+                          tickLine={false}
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis
+                          tickFormatter={(v: number) => `R$${(v / 1000).toFixed(0)}k`}
+                          tick={{ fontSize: 11, fill: '#94a3b8' }}
+                          axisLine={false}
+                          tickLine={false}
+                          width={48}
+                        />
+                        <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
+                        <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 6, color: '#94a3b8' }} />
+                        {activeData.map((ch, idx) => (
+                          <Bar
+                            key={ch}
+                            dataKey={ch}
+                            stackId="invest"
+                            fill={CHANNEL_COLORS[ch]}
+                            name={ch}
+                            radius={idx === activeData.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+                          >
+                            {idx === activeData.length - 1 && (
+                              <LabelList
+                                dataKey="_total"
+                                position="top"
+                                formatter={(v: number) => v > 0 ? `R$${(v / 1000).toFixed(0)}k` : ''}
+                                style={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }}
+                              />
+                            )}
+                          </Bar>
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )
+                })()
+              )}
             </div>
           )}
 
           {/* Footer stats */}
-          <div className="flex items-center border-t border-gray-100 divide-x divide-gray-100">
-            <div className="flex flex-col px-5 py-3 flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-gray-100 border-t border-gray-100">
+            <div className="flex flex-col px-4 sm:px-5 py-3">
               <span className="text-xs text-gray-400 mb-0.5">Média diária — últimos 7 dias</span>
-              <span className="text-lg font-bold text-[#1a1a1a]">{fmtBRL(avg7dTotal)}<span className="text-xs font-normal text-gray-400">/dia</span></span>
+              <span className="text-base sm:text-lg font-bold text-[#1a1a1a]">{fmtBRL(avg7dTotal)}<span className="text-xs font-normal text-gray-400">/dia</span></span>
             </div>
-            <div className="flex flex-col px-5 py-3 flex-1">
+            <div className="flex flex-col px-4 sm:px-5 py-3">
               <span className="text-xs text-gray-400 mb-0.5">Média diária — período completo</span>
-              <span className="text-lg font-bold text-[#1a1a1a]">{fmtBRL(avgAllPeriod)}<span className="text-xs font-normal text-gray-400">/dia</span></span>
+              <span className="text-base sm:text-lg font-bold text-[#1a1a1a]">{fmtBRL(avgAllPeriod)}<span className="text-xs font-normal text-gray-400">/dia</span></span>
             </div>
-            <div className="flex flex-col px-5 py-3 flex-1">
+            <div className="flex flex-col px-4 sm:px-5 py-3">
               <span className="text-xs text-gray-400 mb-0.5">Projeção mensal (base 7d)</span>
-              <span className="text-lg font-bold text-[#0D2F9F]">{fmtBRL(projection)}</span>
+              <span className="text-base sm:text-lg font-bold text-[#0D2F9F]">{fmtBRL(projection)}</span>
               <span className="text-xs text-gray-400">{daysInMonth} dias no mês</span>
             </div>
           </div>

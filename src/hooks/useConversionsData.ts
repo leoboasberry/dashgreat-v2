@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchWindsorData, invalidateWindsorCache, type WindsorRow } from '../api/windsor'
+import { fetchWindsorForAccount, invalidateWindsorAccountCache } from '../api/windsorAccounts'
 import { fetchEvents, invalidateSupabaseCache, type SupabaseEvent } from '../api/supabase'
 
 // Re-export types so existing component imports still work
@@ -29,22 +30,36 @@ export function useConversionsData(
   const load = useCallback(async (forceRefresh = false) => {
     if (forceRefresh) {
       invalidateWindsorCache(dateFrom, dateTo)
+      invalidateWindsorAccountCache(dateFrom, dateTo, 'lab')
+      invalidateWindsorAccountCache(dateFrom, dateTo, 'openai')
       invalidateSupabaseCache(dateFrom, dateTo)
     }
     setState((s) => ({ ...s, loading: true, error: null }))
 
     const warnings: string[] = []
 
-    const [rawWindsorRows, rawEvents] = await Promise.all([
+    const [mainRows, labRows, openaiRows, rawEvents] = await Promise.all([
+      // Main combined fetch (Meta Principal + Google + Bing + LinkedIn + TikTok)
       fetchWindsorData(dateFrom, dateTo).catch((err: unknown) => {
         warnings.push(`Windsor: ${err instanceof Error ? err.message : 'erro desconhecido'}`)
         return [] as WindsorRow[]
       }),
+      // Meta Lab — fetched separately so spend não é duplicado
+      fetchWindsorForAccount(dateFrom, dateTo, 'lab').catch(() => []),
+      // OpenAI Ads — fetched separately
+      fetchWindsorForAccount(dateFrom, dateTo, 'openai').catch(() => []),
       fetchEvents(dateFrom, dateTo).catch((err: unknown) => {
         warnings.push(`Supabase: ${err instanceof Error ? err.message : 'erro desconhecido'}`)
         return [] as SupabaseEvent[]
       }),
     ])
+
+    // WindsorRowTagged already has `account` set; cast to WindsorRow (superset)
+    const rawWindsorRows: WindsorRow[] = [
+      ...mainRows,
+      ...(labRows as WindsorRow[]),
+      ...(openaiRows as WindsorRow[]),
+    ]
 
     setState({
       loading: false,

@@ -13,6 +13,7 @@ import LeadsSection from './components/leads/LeadsSection'
 import BackfillSection from './components/backfill/BackfillSection'
 import AudiencesSection from './components/audiences/AudiencesSection'
 import CapiSection from './components/capi/CapiSection'
+import TestsSection from './components/tests/TestsSection'
 import { clearAllCache } from './api/cache'
 
 const STORAGE_KEY = 'gp_config'
@@ -33,7 +34,7 @@ const ENV_CONFIG: Config | null =
 // Password stored as plain text env var (VITE_GP_PASSWORD) or as SHA-256 hash in localStorage
 const ENV_PASSWORD: string = (import.meta.env.VITE_GP_PASSWORD as string) ?? ''
 
-type Tab = 'overview' | 'campaigns' | 'conversions' | 'leads' | 'backfill' | 'audiences' | 'capi'
+type Tab = 'overview' | 'campaigns' | 'conversions' | 'leads' | 'backfill' | 'audiences' | 'capi' | 'tests'
 
 function loadConfig(): Config | null {
   try {
@@ -130,7 +131,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {!hideHeader && <img src="/berry-logo.png" alt="Berry" className="h-8 w-auto object-contain" />}
             {!hideHeader && <span className="text-[10px] text-gray-400 font-medium tracking-wide">Controle Geral Performance Berry - Consultoria</span>}
@@ -174,9 +175,12 @@ export default function App() {
         </div>
 
         {/* Tab bar — Conversões always shown; GP-dependent tabs appear once pages load */}
-        <div className="px-4 sm:px-6 flex gap-1 border-t border-gray-100">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 flex gap-1 border-t border-gray-100 overflow-x-auto">
           <TabButton active={activeTab === 'conversions'} onClick={() => setActiveTab('conversions')}>
             Conversões
+          </TabButton>
+          <TabButton active={activeTab === 'tests'} onClick={() => setActiveTab('tests')}>
+            Testes
           </TabButton>
           {pages.length > 0 && (
             <>
@@ -207,7 +211,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="px-4 sm:px-6 py-6 flex flex-col gap-6">
+      <main className="max-w-[1440px] mx-auto px-4 sm:px-6 py-6 flex flex-col gap-6">
         {/* Error banner */}
         {error && (
           <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
@@ -235,6 +239,9 @@ export default function App() {
 
         {/* ── CAPI Meta — always available ── */}
         {activeTab === 'capi' && <CapiSection pages={pages} />}
+
+        {/* ── Testes — always available ── */}
+        {activeTab === 'tests' && <TestsSection />}
 
         {pages.length > 0 && (
           <>
@@ -319,7 +326,7 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+      className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 ${
         active
           ? 'border-[#0D2F9F] text-[#0D2F9F]'
           : 'border-transparent text-gray-500 hover:text-gray-700'

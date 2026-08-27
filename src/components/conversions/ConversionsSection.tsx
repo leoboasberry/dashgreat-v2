@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { RefreshCw, Loader2, AlertCircle, Info, ChevronDown, ChevronUp, Download } from 'lucide-react'
+import { RefreshCw, Loader2, AlertCircle, Info, Download, SlidersHorizontal, X } from 'lucide-react'
 import { useConversionsData } from '../../hooks/useConversionsData'
 import { CHANNELS, normalizeCrmChannel } from '../../utils/channelNorm'
 import { parseAllLeads, filterLeads, parseCampaign } from '../../utils/parseLeads'
@@ -81,7 +81,7 @@ export default function ConversionsSection({ pages }: Props) {
   const [selRevenue, setSelRevenue] = useState<string[]>(() => saved.current.selRevenue ?? [])
   const [selSegments, setSelSegments] = useState<string[]>(() => saved.current.selSegments ?? [])
   const [onlyActive, setOnlyActive] = useState(() => saved.current.onlyActive ?? false)
-  const [filtersOpen, setFiltersOpen] = useState(() => saved.current.filtersOpen ?? true)
+  const [filtersOpen, setFiltersOpen] = useState(() => saved.current.filtersOpen ?? false)
 
   // Track whether revenue was already initialized (from storage or auto-init)
   const revenueInitialized = useRef(saved.current.revenueInitialized ?? false)
@@ -547,204 +547,270 @@ export default function ConversionsSection({ pages }: Props) {
         </div>
       )}
 
-      {/* Filters — sticky below header */}
-      <div className="sticky top-16 z-[9] bg-white rounded-2xl shadow-sm border border-gray-100">
-        {/* Toggle header — always visible */}
-        <div
-          className="flex items-center justify-between px-4 py-2.5 cursor-pointer select-none hover:bg-gray-50 transition-colors"
-          onClick={() => setFiltersOpen((v) => !v)}
-        >
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-medium text-gray-500">Filtros</span>
-            {/* Active filter summary when collapsed */}
-            {!filtersOpen && (
-              <>
-                {/* Period */}
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                  {dateFrom.split('-').reverse().join('/')} – {dateTo.split('-').reverse().join('/')}
-                </span>
-                {/* Active channels */}
-                {activeChannels.length > 0 && (
-                  <span className="text-xs bg-[#0D2F9F] text-white px-2 py-0.5 rounded-full">
-                    {activeChannels.join(', ')}
-                  </span>
-                )}
-                {/* Strategic filters count */}
-                {(selCampaigns.length + selAdSets.length + selAds.length + selPages.length + selRevenue.length + selSegments.length) > 0 && (
-                  <span className="text-xs bg-blue-50 text-[#0D2F9F] font-medium px-2 py-0.5 rounded-full">
-                    {selCampaigns.length + selAdSets.length + selAds.length + selPages.length + selRevenue.length + selSegments.length} filtro(s)
-                  </span>
-                )}
-                {/* Only active */}
-                {onlyActive && (
-                  <span className="text-xs bg-emerald-50 text-emerald-700 font-medium px-2 py-0.5 rounded-full">
-                    Apenas ativos
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-          <button className="text-gray-400 hover:text-gray-600 transition-colors ml-2 shrink-0">
-            {filtersOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-          </button>
+      {/* ── Compact filter bar (always visible) ── */}
+      <div className="sticky top-16 z-[9] bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-2.5 flex items-center gap-3">
+        {/* Period summary */}
+        <span className="text-xs text-gray-500 font-medium shrink-0">
+          {dateFrom.split('-').reverse().join('/')} – {dateTo.split('-').reverse().join('/')}
+        </span>
+
+        {/* Active filter badges */}
+        <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-hidden">
+          {activeChannels.length > 0 && (
+            <span className="text-xs bg-[#0D2F9F] text-white px-2 py-0.5 rounded-full shrink-0">
+              {activeChannels.join(', ')}
+            </span>
+          )}
+          {(() => {
+            const n = selCampaigns.length + selAdSets.length + selAds.length + selPages.length + selRevenue.length + selSegments.length
+            return n > 0 ? (
+              <span className="text-xs bg-blue-50 text-[#0D2F9F] font-medium px-2 py-0.5 rounded-full shrink-0">
+                {n} filtro{n !== 1 ? 's' : ''}
+              </span>
+            ) : null
+          })()}
+          {onlyActive && (
+            <span className="text-xs bg-emerald-50 text-emerald-700 font-medium px-2 py-0.5 rounded-full shrink-0">
+              Apenas ativos
+            </span>
+          )}
+          {excludedCampaigns.length > 0 && (
+            <span className="text-xs bg-red-50 text-red-600 font-medium px-2 py-0.5 rounded-full shrink-0">
+              {excludedCampaigns.length} excluída{excludedCampaigns.length !== 1 ? 's' : ''}
+            </span>
+          )}
+          {investmentPartial && (
+            <span title="Investimento exibe total do período — ver Filtros" className="shrink-0">
+              <Info size={13} className="text-amber-400" />
+            </span>
+          )}
         </div>
 
-        {/* Collapsible body */}
-        {filtersOpen && (
-          <div className="px-4 pb-4 flex flex-col gap-2.5 border-t border-gray-100">
-            {/* Row 1: Período — inputs + presets + Refresh */}
-            <div className="flex flex-wrap items-center gap-2 pt-3">
-              <span className="text-xs text-gray-400 font-medium shrink-0">Período</span>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0D2F9F] focus:border-transparent"
-              />
-              <span className="text-xs text-gray-400">até</span>
-              <input
-                type="date"
-                value={dateTo}
-                min={dateFrom}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0D2F9F] focus:border-transparent"
-              />
-              <div className="w-px h-4 bg-gray-200 hidden sm:block" />
-              {getDatePresets().map(({ label, from, to }) => (
-                <button
-                  key={label}
-                  onClick={() => { setDateFrom(from); setDateTo(to) }}
-                  className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
-                    dateFrom === from && dateTo === to
-                      ? 'border-[#0D2F9F] bg-blue-50 text-[#0D2F9F] font-medium'
-                      : 'border-gray-200 text-gray-500 hover:bg-gray-50'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-              <div className="ml-auto shrink-0 flex items-center gap-1">
-                <button
-                  onClick={(e) => { e.stopPropagation(); reload() }}
-                  disabled={loading}
-                  className="flex items-center gap-1.5 text-sm text-[#0D2F9F] hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-                  <span className="hidden sm:inline">Atualizar</span>
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); downloadJson() }}
-                  title="Exportar dados para IA (JSON)"
-                  className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <Download size={13} />
-                </button>
+        {/* Action buttons */}
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={reload}
+            disabled={loading}
+            title="Atualizar"
+            className="p-1.5 text-gray-400 hover:text-[#0D2F9F] hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <button
+            onClick={downloadJson}
+            title="Exportar JSON"
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <Download size={14} />
+          </button>
+          <button
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Filtros"
+            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+              filtersOpen
+                ? 'border-[#0D2F9F] bg-blue-50 text-[#0D2F9F]'
+                : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            <SlidersHorizontal size={13} />
+            Filtros
+          </button>
+        </div>
+      </div>
+
+      {/* ── Filter drawer (right side) ── */}
+      {filtersOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-[19] bg-black/20 backdrop-blur-[1px]"
+            onClick={() => setFiltersOpen(false)}
+          />
+          {/* Drawer */}
+          <div className="fixed top-0 right-0 h-full w-full max-w-sm z-[20] bg-white shadow-2xl flex flex-col">
+            {/* Drawer header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal size={15} className="text-[#0D2F9F]" />
+                <span className="text-sm font-semibold text-gray-800">Filtros</span>
+              </div>
+              <button
+                onClick={() => setFiltersOpen(false)}
+                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Drawer body — scrollable */}
+            <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-5">
+
+              {/* Período */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Período</p>
+                <div className="flex items-center gap-2 mb-3">
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="flex-1 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0D2F9F]"
+                  />
+                  <span className="text-xs text-gray-400">até</span>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="flex-1 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0D2F9F]"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {getDatePresets().map(({ label, from, to }) => (
+                    <button
+                      key={label}
+                      onClick={() => { setDateFrom(from); setDateTo(to) }}
+                      className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+                        dateFrom === from && dateTo === to
+                          ? 'border-[#0D2F9F] bg-blue-50 text-[#0D2F9F] font-medium'
+                          : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Canal */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Canal</p>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setActiveChannels([])}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      activeChannels.length === 0
+                        ? 'bg-gray-800 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Todos
+                  </button>
+                  {CHANNELS.map((ch) => (
+                    <button
+                      key={ch}
+                      onClick={() => toggleChannel(ch)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        activeChannels.includes(ch)
+                          ? 'bg-[#0D2F9F] text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {ch}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Segmentação */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Segmentação</p>
+                <div className="flex flex-col gap-2">
+                  <MultiSelect
+                    label="Campanha"
+                    options={filterOptions.campaigns}
+                    selected={selCampaigns}
+                    onChange={handleCampaignChange}
+                    statusMap={campaignStatuses}
+                  />
+                  <MultiSelect
+                    label="Conjunto"
+                    options={filterOptions.adSets}
+                    selected={selAdSets}
+                    onChange={handleAdSetChange}
+                    disabled={filterOptions.adSets.length === 0}
+                  />
+                  <MultiSelect
+                    label="Anúncio"
+                    options={filterOptions.ads}
+                    selected={selAds}
+                    onChange={setSelAds}
+                    disabled={filterOptions.ads.length === 0}
+                  />
+                  <MultiSelect
+                    label="Landing Page"
+                    options={pageOptions.map((p) => p.label)}
+                    selected={selPages.map((id) => pageNameMap.get(id) ?? id)}
+                    onChange={(labels) =>
+                      setSelPages(labels.map((l) => pageOptions.find((p) => p.label === l)?.id ?? l))
+                    }
+                    disabled={pageOptions.length === 0}
+                  />
+                  <MultiSelect
+                    label="Faturamento"
+                    options={filterOptions.revenue}
+                    selected={selRevenue}
+                    onChange={setSelRevenue}
+                    disabled={filterOptions.revenue.length === 0}
+                  />
+                  <MultiSelect
+                    label="Segmento"
+                    options={filterOptions.segments}
+                    selected={selSegments}
+                    onChange={setSelSegments}
+                    disabled={filterOptions.segments.length === 0}
+                  />
+                </div>
+              </div>
+
+              {/* Exclusões & opções */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Exclusões & opções</p>
+                <div className="flex flex-col gap-2">
+                  <ExcludedCampaignsFilter
+                    allCampaigns={allWindsorCampaigns}
+                    excluded={excludedCampaigns}
+                    onChange={setExcludedCampaigns}
+                  />
+                  <ExcludedUtmsFilter
+                    allUtms={allUtmCampaigns}
+                    excluded={excludedUtms}
+                    onChange={setExcludedUtms}
+                  />
+                  <button
+                    onClick={() => setOnlyActive((v) => !v)}
+                    className={`flex items-center gap-1.5 text-xs border rounded-lg px-3 py-2 w-full transition-colors ${
+                      onlyActive
+                        ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                        : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${onlyActive ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                    Apenas ativos
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Row 2: Canal + Segmentação + Exclusões */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-gray-400 font-medium shrink-0">Canal</span>
+            {/* Investment partial note */}
+            {investmentPartial && (
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2.5 rounded-xl text-xs mx-0">
+                <Info size={13} className="shrink-0 mt-0.5" />
+                <span>Filtro de <strong>LP</strong>, <strong>Faturamento</strong> ou <strong>Segmento</strong> ativo sem Campanha — investimento exibe o total do período.</span>
+              </div>
+            )}
+
+            {/* Drawer footer */}
+            <div className="px-5 py-4 border-t border-gray-100 shrink-0">
               <button
-                onClick={(e) => { e.stopPropagation(); setActiveChannels([]) }}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  activeChannels.length === 0
-                    ? 'bg-gray-800 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                onClick={() => setFiltersOpen(false)}
+                className="w-full bg-[#0D2F9F] text-white text-sm font-medium py-2.5 rounded-xl hover:bg-[#0A2580] transition-colors"
               >
-                Todos
-              </button>
-              {CHANNELS.map((ch) => (
-                <button
-                  key={ch}
-                  onClick={(e) => { e.stopPropagation(); toggleChannel(ch) }}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    activeChannels.includes(ch)
-                      ? 'bg-[#0D2F9F] text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {ch}
-                </button>
-              ))}
-
-              <div className="w-px h-4 bg-gray-200 mx-0.5 hidden sm:block" />
-
-              <MultiSelect
-                label="Campanha"
-                options={filterOptions.campaigns}
-                selected={selCampaigns}
-                onChange={handleCampaignChange}
-                statusMap={campaignStatuses}
-              />
-              <MultiSelect
-                label="Conjunto"
-                options={filterOptions.adSets}
-                selected={selAdSets}
-                onChange={handleAdSetChange}
-                disabled={filterOptions.adSets.length === 0}
-              />
-              <MultiSelect
-                label="Anúncio"
-                options={filterOptions.ads}
-                selected={selAds}
-                onChange={setSelAds}
-                disabled={filterOptions.ads.length === 0}
-              />
-              <MultiSelect
-                label="Landing Page"
-                options={pageOptions.map((p) => p.label)}
-                selected={selPages.map((id) => pageNameMap.get(id) ?? id)}
-                onChange={(labels) =>
-                  setSelPages(labels.map((l) => pageOptions.find((p) => p.label === l)?.id ?? l))
-                }
-                disabled={pageOptions.length === 0}
-              />
-              <MultiSelect
-                label="Faturamento"
-                options={filterOptions.revenue}
-                selected={selRevenue}
-                onChange={setSelRevenue}
-                disabled={filterOptions.revenue.length === 0}
-              />
-              <MultiSelect
-                label="Segmento"
-                options={filterOptions.segments}
-                selected={selSegments}
-                onChange={setSelSegments}
-                disabled={filterOptions.segments.length === 0}
-              />
-
-              <div className="w-px h-4 bg-gray-200 mx-0.5 hidden sm:block" />
-
-              <ExcludedCampaignsFilter
-                allCampaigns={allWindsorCampaigns}
-                excluded={excludedCampaigns}
-                onChange={setExcludedCampaigns}
-              />
-
-              <ExcludedUtmsFilter
-                allUtms={allUtmCampaigns}
-                excluded={excludedUtms}
-                onChange={setExcludedUtms}
-              />
-
-              <button
-                onClick={(e) => { e.stopPropagation(); setOnlyActive((v) => !v) }}
-                className={`flex items-center gap-1.5 text-xs border rounded-lg px-2.5 py-1.5 whitespace-nowrap transition-colors ${
-                  onlyActive
-                    ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
-                    : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${onlyActive ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                Apenas ativos
+                Aplicar filtros
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* Loading */}
       {loading && (
@@ -759,17 +825,6 @@ export default function ConversionsSection({ pages }: Props) {
         <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
           <AlertCircle size={16} className="shrink-0" />
           {error}
-        </div>
-      )}
-
-      {/* Investment partial warning */}
-      {investmentPartial && (
-        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-[#0D2F9F] px-4 py-3 rounded-xl text-sm">
-          <Info size={15} className="shrink-0" />
-          <span>
-            Filtro de <strong>Landing Page</strong>, <strong>Faturamento</strong> ou <strong>Segmento</strong> ativo sem filtro de Campanha —{' '}
-            <strong>Investimento exibe o total do período</strong> (não filtrável no Windsor).
-          </span>
         </div>
       )}
 

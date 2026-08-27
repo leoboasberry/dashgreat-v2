@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import {
   BarChart,
@@ -11,6 +11,16 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { ParsedLead } from '../../utils/parseLeads'
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+  return isMobile
+}
 
 interface Props {
   filteredLeads: ParsedLead[]
@@ -38,6 +48,7 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export default function DailyLeadsChart({ filteredLeads }: Props) {
   const [collapsed, setCollapsed] = useState(false)
+  const isMobile = useIsMobile()
 
   const leadsByDate: Record<string, number> = {}
   for (const l of filteredLeads) {
@@ -72,30 +83,33 @@ export default function DailyLeadsChart({ filteredLeads }: Props) {
 
       {!collapsed && (
         <div className="px-2 pb-4">
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={data} margin={{ top: 18, right: 16, left: 0, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={isMobile ? 150 : 180}>
+            <BarChart data={data} margin={{ top: isMobile ? 4 : 18, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
               <XAxis
                 dataKey="date"
                 tickFormatter={fmtDate}
-                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                tick={{ fontSize: isMobile ? 10 : 11, fill: '#94a3b8' }}
                 axisLine={false}
                 tickLine={false}
+                interval={isMobile ? 'preserveStartEnd' : 0}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                tick={{ fontSize: isMobile ? 10 : 11, fill: '#94a3b8' }}
                 axisLine={false}
                 tickLine={false}
-                width={28}
+                width={isMobile ? 22 : 28}
                 domain={[0, max + Math.ceil(max * 0.15)]}
               />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
-              <Bar dataKey="leads" name="Leads" fill="#0D2F9F" radius={[3, 3, 0, 0]} maxBarSize={32}>
-                <LabelList
-                  dataKey="leads"
-                  position="top"
-                  style={{ fontSize: 11, fill: '#a5b4fc', fontWeight: 500 }}
-                />
+              <Bar dataKey="leads" name="Leads" fill="#0D2F9F" radius={[3, 3, 0, 0]} maxBarSize={isMobile ? 20 : 32}>
+                {!isMobile && (
+                  <LabelList
+                    dataKey="leads"
+                    position="top"
+                    style={{ fontSize: 11, fill: '#a5b4fc', fontWeight: 500 }}
+                  />
+                )}
               </Bar>
             </BarChart>
           </ResponsiveContainer>

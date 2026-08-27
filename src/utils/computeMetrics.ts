@@ -312,8 +312,9 @@ export function computeMetrics(
         adStatuses[adKey] = row.status
       }
     }
-    // adset status — Meta only
-    if (normalizeWindsorChannel(row.datasource, row.source) === 'Meta') {
+    // adset status — Meta only (includes Meta Lab)
+    const _ch = normalizeWindsorChannel(row.datasource, row.source, row.account)
+    if (_ch === 'Meta' || _ch === 'Meta Lab') {
       const adSetKey = extractAdSetCode(row.adset_name ?? '')
       if (adSetKey && row.status) {
         if (!adSetStatusDate[adSetKey] || row.date > adSetStatusDate[adSetKey]) {
@@ -391,7 +392,7 @@ export function computeMetrics(
 
   for (const row of filteredWindsor) {
     if (!row.date) continue
-    const ch = normalizeWindsorChannel(row.datasource, row.source)
+    const ch = normalizeWindsorChannel(row.datasource, row.source, row.account)
     const spend = Number(row.spend) || 0
     spendByChannel[ch] += spend
     if (!spendByDateChannel[row.date]) {
@@ -430,7 +431,7 @@ export function computeMetrics(
     const rawBudget = row.campaign_daily_budget ?? row.campaign_budget
     const budget = parseBudget(rawBudget, row.datasource)
     if (budget > 0) {
-      const ch = normalizeWindsorChannel(row.datasource, row.source)
+      const ch = normalizeWindsorChannel(row.datasource, row.source, row.account)
       activeSpendByChannel[ch] += budget
       campaignsWithCampaignBudget.add(cc)
     }
@@ -443,7 +444,7 @@ export function computeMetrics(
     if (campaignsWithCampaignBudget.has(cc)) continue
     const budget = parseBudget(row.adset_daily_budget, row.datasource)
     if (budget > 0) {
-      const ch = normalizeWindsorChannel(row.datasource, row.source)
+      const ch = normalizeWindsorChannel(row.datasource, row.source, row.account)
       activeSpendByChannel[ch] += budget
     }
   }

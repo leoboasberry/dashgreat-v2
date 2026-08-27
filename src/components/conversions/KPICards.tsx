@@ -1,5 +1,5 @@
-import { useState, Fragment } from 'react'
-import { ArrowRight, Target, FileDown } from 'lucide-react'
+import { useState, useEffect, Fragment } from 'react'
+import { ArrowRight, ArrowDown, Target, FileDown } from 'lucide-react'
 import type { FunnelCounts } from '../../hooks/useConversionsData'
 import type { ChannelMetrics } from '../../utils/computeMetrics'
 import type { GoalsConfig } from '../../utils/goals'
@@ -27,6 +27,16 @@ function pacingBg(ritmo: number): string {
   return ritmo >= 97 && ritmo <= 102 ? 'bg-emerald-50' : 'bg-red-50'
 }
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+  return isMobile
+}
+
 function Skeleton({ wide = false }: { wide?: boolean }) {
   return (
     <div className={`h-8 ${wide ? 'w-32' : 'w-20'} bg-gray-100 rounded-lg animate-pulse`} />
@@ -48,7 +58,7 @@ function GoalBadge({ value, goal, pacingFactor }: { value: number; goal: number;
     'bg-red-50'
   return (
     <span
-      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap ${color} ${bg}`}
+      className={`text-[9px] sm:text-[10px] font-semibold px-1 sm:px-1.5 py-0.5 rounded-md whitespace-nowrap ${color} ${bg}`}
       title={`Meta mensal: ${fmt(goal)}`}
     >
       {fmt(value)}/{fmt(Math.round(accGoal))} ({pctStr})
@@ -81,6 +91,7 @@ export default function KPICards({
   onOpenGoals, onDownloadStage, dateTo,
 }: Props) {
   const [metaTooltip, setMetaTooltip] = useState(false)
+  const isMobile = useIsMobile()
   const ticketMedio = funnel.won > 0 ? totalMRR / funnel.won : null
   const ritmo = pacingDeveria && pacingDeveria > 0 ? (totalSpend / pacingDeveria) * 100 : null
 
@@ -124,39 +135,34 @@ export default function KPICards({
     <div className="flex flex-col gap-3">
 
       {/* Row 1: Two grouped sections */}
-      <div className="flex gap-3 items-stretch">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
 
         {/* ── CUSTO ── */}
-        <div className="flex flex-col gap-2 shrink-0">
+        <div className="flex flex-col gap-2 lg:flex-[2]">
           <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">Custo</span>
-          <div className="flex gap-3 flex-1">
+          <div className="flex flex-col sm:flex-row gap-3">
 
             {/* Investimento Total */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-2 min-w-[220px]">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-2 flex-1 min-w-0">
               <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Investimento Total</span>
 
-              {/* Value + Ritmo badge side by side */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex flex-col">
-                  {loading ? <Skeleton wide /> : (
-                    <span className="text-2xl font-bold text-[#1a1a1a] leading-tight">{fmtBRL(totalSpend)}</span>
-                  )}
-                  {!loading && pacingBudget && pacingBudget > 0 && pacingDeveria != null && (
-                    <span className="text-xs text-gray-400 mt-1">
-                      Deveríamos: <span className="font-medium text-gray-600">{fmtBRL(pacingDeveria)}</span>
-                    </span>
-                  )}
-                  {!loading && !(pacingBudget && pacingBudget > 0) && (
-                    <span className="text-xs text-gray-300 mt-1">Configure verba no Pacing ↓</span>
-                  )}
-                </div>
+              {/* Value + Ritmo badge */}
+              <div className="flex flex-col gap-1">
+                {loading ? <Skeleton wide /> : (
+                  <span className="text-xl sm:text-2xl font-bold text-[#1a1a1a] leading-tight">{fmtBRL(totalSpend)}</span>
+                )}
+                {!loading && pacingBudget && pacingBudget > 0 && pacingDeveria != null && (
+                  <span className="text-xs text-gray-400">
+                    Deveríamos: <span className="font-medium text-gray-600">{fmtBRL(pacingDeveria)}</span>
+                  </span>
+                )}
+                {!loading && !(pacingBudget && pacingBudget > 0) && (
+                  <span className="text-xs text-gray-300">Configure verba no Pacing ↓</span>
+                )}
                 {!loading && ritmo !== null && (
-                  <div className="flex flex-col items-end shrink-0">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${pacingColor(ritmo)} ${pacingBg(ritmo)}`}>
-                      Ritmo: {ritmo.toFixed(1)}%
-                    </span>
-                    <span className="text-[10px] text-gray-400 italic mt-0.5">sem imposto</span>
-                  </div>
+                  <span className={`self-start text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${pacingColor(ritmo)} ${pacingBg(ritmo)}`}>
+                    Ritmo: {ritmo.toFixed(1)}%
+                  </span>
                 )}
               </div>
 
@@ -172,10 +178,10 @@ export default function KPICards({
                           onMouseEnter={() => setMetaTooltip(true)}
                           onMouseLeave={() => setMetaTooltip(false)}
                         >
-                          <span className="text-xs text-gray-400 underline decoration-dotted decoration-gray-300">Meta Ads</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-gray-700">{fmtBRL(metaSpend)}</span>
-                            <span className="text-[11px] font-semibold text-[#0D2F9F] w-9 text-right">{pct(metaSpend, totalSpend)}</span>
+                          <span className="text-xs text-gray-400 underline decoration-dotted decoration-gray-300 whitespace-nowrap">Meta Ads</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-xs font-medium text-gray-700 whitespace-nowrap">{fmtBRL(metaSpend)}</span>
+                            <span className="text-[11px] font-semibold text-[#0D2F9F] whitespace-nowrap">{pct(metaSpend, totalSpend)}</span>
                           </div>
                         </div>
                         {metaTooltip && (
@@ -188,10 +194,10 @@ export default function KPICards({
                     )}
                     {googleSpend > 0 && (
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs text-gray-400">Google Ads</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-gray-700">{fmtBRL(googleSpend)}</span>
-                          <span className="text-[11px] font-semibold text-[#0D2F9F] w-9 text-right">{pct(googleSpend, totalSpend)}</span>
+                        <span className="text-xs text-gray-400 whitespace-nowrap">Google Ads</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-xs font-medium text-gray-700 whitespace-nowrap">{fmtBRL(googleSpend)}</span>
+                          <span className="text-[11px] font-semibold text-[#0D2F9F] whitespace-nowrap">{pct(googleSpend, totalSpend)}</span>
                         </div>
                       </div>
                     )}
@@ -201,7 +207,7 @@ export default function KPICards({
             </div>
 
             {/* CPMQL */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-2 min-w-[200px]">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-2 flex-1 min-w-0">
               {/* Title */}
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">CPMQL</span>
@@ -209,21 +215,19 @@ export default function KPICards({
               </div>
 
               {/* Value + badge */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex flex-col">
-                  {loading ? <Skeleton /> : (
-                    <span className="text-2xl font-bold text-[#1a1a1a] leading-tight">{cpl !== null ? fmtBRL(cpl) : '—'}</span>
-                  )}
-                  {!loading && cplComImposto !== null && (
-                    <span className="text-xs text-gray-400 mt-1">
-                      com imposto: <span className="font-medium text-gray-600">{fmtBRL(cplComImposto)}</span>
-                    </span>
-                  )}
-                </div>
+              <div className="flex flex-col gap-1">
+                {loading ? <Skeleton /> : (
+                  <span className="text-xl sm:text-2xl font-bold text-[#1a1a1a] leading-tight">{cpl !== null ? fmtBRL(cpl) : '—'}</span>
+                )}
+                {!loading && cplComImposto !== null && (
+                  <span className="text-xs text-gray-400">
+                    c/ imposto: <span className="font-medium text-gray-600">{fmtBRL(cplComImposto)}</span>
+                  </span>
+                )}
                 {!loading && cpmqlGoal > 0 && cpl !== null && cpmqlDelta !== null && (
                   <span
                     title={`Alvo: ${fmtBRL(cpmqlGoal)}`}
-                    className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 mt-0.5 ${
+                    className={`self-start text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
                       cpmqlOk ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
                     }`}
                   >
@@ -257,32 +261,32 @@ export default function KPICards({
           </div>
         </div>
 
-        {/* Vertical divider */}
-        <div className="w-px bg-gray-200 mt-5 self-stretch" />
+        {/* Vertical divider — only on desktop */}
+        <div className="hidden lg:block w-px bg-gray-200 mt-5 self-stretch" />
 
         {/* ── RESULTADO ── */}
-        <div className="flex flex-col gap-2 flex-1">
+        <div className="flex flex-col gap-2 lg:flex-[3]">
           <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">Resultado</span>
-          <div className="flex gap-3 flex-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 flex-1">
 
             {/* MRR */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-1 flex-1">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-1">
               <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">MRR Total</span>
-              {loading ? <Skeleton /> : <span className="text-2xl font-bold text-[#1a1a1a]">{fmtBRL(totalMRR)}</span>}
+              {loading ? <Skeleton /> : <span className="text-xl sm:text-2xl font-bold text-[#1a1a1a]">{fmtBRL(totalMRR)}</span>}
               <span className="text-xs text-gray-400">Receita recorrente mensal</span>
             </div>
 
             {/* Ticket Médio */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-1 flex-1">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-1">
               <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Ticket Médio</span>
-              {loading ? <Skeleton /> : <span className="text-2xl font-bold text-[#1a1a1a]">{ticketMedio !== null ? fmtBRL(ticketMedio) : '—'}</span>}
+              {loading ? <Skeleton /> : <span className="text-xl sm:text-2xl font-bold text-[#1a1a1a]">{ticketMedio !== null ? fmtBRL(ticketMedio) : '—'}</span>}
               <span className="text-xs text-gray-400">MRR ÷ Vendas</span>
             </div>
 
             {/* CPA */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-1 flex-1">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-1 col-span-2 sm:col-span-1">
               <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">CPA</span>
-              {loading ? <Skeleton /> : <span className="text-2xl font-bold text-[#1a1a1a]">{cpa !== null ? fmtBRL(cpa) : '—'}</span>}
+              {loading ? <Skeleton /> : <span className="text-xl sm:text-2xl font-bold text-[#1a1a1a]">{cpa !== null ? fmtBRL(cpa) : '—'}</span>}
               <span className="text-xs text-gray-400">Invest. ÷ Vendas</span>
               {!loading && cpa !== null && ticketMedio !== null && ticketMedio > 0 && (
                 <span className="text-[10px] text-gray-500 font-medium mt-0.5">
@@ -312,53 +316,109 @@ export default function KPICards({
           )}
         </div>
 
-        <div className="flex items-center w-full py-2">
-          {stages.map((stage, i) => {
-            const maxValue = Math.max(...stages.map((s) => s.value), 1)
-            const ratio = maxValue > 0 ? Math.sqrt(stage.value / maxValue) : 0
-            const size = Math.round(36 + ratio * (88 - 36))
-            const fontSize = Math.max(12, Math.round(size * 0.22))
-            const goal = stage.goalKey && goals ? (goals[stage.goalKey] as number) : 0
-            return (
-              <Fragment key={stage.label}>
-                {i > 0 && (
-                  <div className="flex flex-col items-center shrink-0 px-1">
-                    <ArrowRight size={14} className="text-gray-300" />
-                    <span className="text-[10px] text-gray-400 whitespace-nowrap mt-0.5">
-                      {!(loading || stages[i - 1].loadingState || stage.loadingState)
-                        ? pct(stage.value, stages[i - 1].value)
-                        : ''}
-                    </span>
-                  </div>
-                )}
-                <div className="flex flex-col items-center flex-1 gap-1.5">
-                  <span className="text-[11px] text-gray-500 font-medium whitespace-nowrap">{stage.label}</span>
-                  <div
-                    className="bg-[#0D2F9F] rounded-2xl flex items-center justify-center"
-                    style={{ width: size, height: size }}
-                  >
-                    {stage.loadingState
-                      ? <div className="w-8 h-4 bg-white/20 rounded animate-pulse" />
-                      : <span className="text-white font-bold leading-none text-center px-1" style={{ fontSize }}>{fmt(stage.value)}</span>
-                    }
-                  </div>
-                  {!stage.loadingState && goal > 0 && (
-                    <GoalBadge value={stage.value} goal={goal} pacingFactor={goalPacingFactor} />
+        {isMobile ? (
+          /* ── Mobile: funil vertical ── */
+          <div className="flex flex-col gap-1 py-1">
+            {stages.map((stage, i) => {
+              const maxValue = Math.max(...stages.map((s) => s.value), 1)
+              const ratio = maxValue > 0 ? Math.sqrt(stage.value / maxValue) : 0
+              const size = Math.round(36 + ratio * (56 - 36))
+              const fontSize = Math.max(10, Math.round(size * 0.26))
+              const goal = stage.goalKey && goals ? (goals[stage.goalKey] as number) : 0
+              return (
+                <Fragment key={stage.label}>
+                  {i > 0 && (
+                    <div className="flex items-center gap-1.5 px-2 py-0.5">
+                      <ArrowDown size={11} className="text-gray-300 shrink-0" />
+                      <span className="text-[10px] text-gray-400">
+                        {!(loading || stages[i - 1].loadingState || stage.loadingState)
+                          ? pct(stage.value, stages[i - 1].value)
+                          : ''}
+                      </span>
+                    </div>
                   )}
-                  {!stage.loadingState && stage.eventType && stage.value > 0 && onDownloadStage && (
-                    <button
-                      onClick={() => onDownloadStage(stage.eventType)}
-                      title={`Baixar ${stage.label} (CSV)`}
-                      className="p-0.5 text-gray-300 hover:text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                  <div className="flex items-center gap-3 px-1">
+                    <div
+                      className="bg-[#0D2F9F] rounded-xl flex items-center justify-center shrink-0"
+                      style={{ width: size, height: size }}
                     >
-                      <FileDown size={11} />
-                    </button>
+                      {stage.loadingState
+                        ? <div className="w-6 h-3 bg-white/20 rounded animate-pulse" />
+                        : <span className="text-white font-bold leading-none text-center px-1" style={{ fontSize }}>{fmt(stage.value)}</span>
+                      }
+                    </div>
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-sm font-medium text-gray-700">{stage.label}</span>
+                      {!stage.loadingState && goal > 0 && (
+                        <GoalBadge value={stage.value} goal={goal} pacingFactor={goalPacingFactor} />
+                      )}
+                    </div>
+                    {!stage.loadingState && stage.eventType && stage.value > 0 && onDownloadStage && (
+                      <button
+                        onClick={() => onDownloadStage(stage.eventType)}
+                        title={`Baixar ${stage.label} (CSV)`}
+                        className="ml-auto p-1 text-gray-300 hover:text-gray-500 hover:bg-gray-100 rounded transition-colors shrink-0"
+                      >
+                        <FileDown size={13} />
+                      </button>
+                    )}
+                  </div>
+                </Fragment>
+              )
+            })}
+          </div>
+        ) : (
+          /* ── Desktop: funil horizontal ── */
+          <div className="overflow-x-auto -mx-1 px-1">
+            <div className="flex items-center py-2 gap-0.5 w-full">
+            {stages.map((stage, i) => {
+              const maxValue = Math.max(...stages.map((s) => s.value), 1)
+              const ratio = maxValue > 0 ? Math.sqrt(stage.value / maxValue) : 0
+              const size = Math.round(36 + ratio * (88 - 36))
+              const fontSize = Math.max(9, Math.round(size * 0.22))
+              const goal = stage.goalKey && goals ? (goals[stage.goalKey] as number) : 0
+              return (
+                <Fragment key={stage.label}>
+                  {i > 0 && (
+                    <div className="flex flex-col items-center shrink-0 px-0.5">
+                      <ArrowRight size={12} className="text-gray-300" />
+                      <span className="text-[9px] text-gray-400 whitespace-nowrap mt-0.5">
+                        {!(loading || stages[i - 1].loadingState || stage.loadingState)
+                          ? pct(stage.value, stages[i - 1].value)
+                          : ''}
+                      </span>
+                    </div>
                   )}
-                </div>
-              </Fragment>
-            )
-          })}
-        </div>
+                  <div className="flex flex-col items-center flex-1 gap-1" style={{ minWidth: size + 8 }}>
+                    <span className="text-[11px] text-gray-500 font-medium whitespace-nowrap">{stage.label}</span>
+                    <div
+                      className="bg-[#0D2F9F] rounded-2xl flex items-center justify-center"
+                      style={{ width: size, height: size }}
+                    >
+                      {stage.loadingState
+                        ? <div className="w-8 h-4 bg-white/20 rounded animate-pulse" />
+                        : <span className="text-white font-bold leading-none text-center px-1" style={{ fontSize }}>{fmt(stage.value)}</span>
+                      }
+                    </div>
+                    {!stage.loadingState && goal > 0 && (
+                      <GoalBadge value={stage.value} goal={goal} pacingFactor={goalPacingFactor} />
+                    )}
+                    {!stage.loadingState && stage.eventType && stage.value > 0 && onDownloadStage && (
+                      <button
+                        onClick={() => onDownloadStage(stage.eventType)}
+                        title={`Baixar ${stage.label} (CSV)`}
+                        className="p-0.5 text-gray-300 hover:text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                      >
+                        <FileDown size={11} />
+                      </button>
+                    )}
+                  </div>
+                </Fragment>
+              )
+            })}
+            </div>
+          </div>
+        )}
       </div>
 
     </div>
