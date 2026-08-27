@@ -414,9 +414,9 @@ export default function TestImportModal({ onClose, onImported }: Props) {
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0 text-[10px]">
-                          {item.raw.account && (
+                          {!!item.raw.account && (
                             <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
-                              {item.raw.account as string}
+                              {String(item.raw.account)}
                             </span>
                           )}
                           {summary && <span className="text-gray-400">{summary}</span>}

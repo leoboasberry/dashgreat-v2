@@ -149,7 +149,7 @@ export default function TestMetricsChart({ days, activity, metric }: Props) {
             fill="#ef4444"
             shape={(props: { cx?: number; cy?: number; payload?: { markerLabel?: string } }) => {
               const { cx = 0, cy = 0, payload } = props
-              if (payload?.marker === null || payload?.marker === undefined) return <g />
+              if ((payload as { marker?: unknown } | undefined)?.marker == null) return <g />
               return (
                 <text x={cx} y={cy - 6} textAnchor="middle" fontSize={14}>
                   {payload?.markerLabel ?? '●'}

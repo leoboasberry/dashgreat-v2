@@ -40,6 +40,7 @@ function classifyCode(code: string): 'ad' | 'adset' | 'campaign' {
   if (/[A-Za-z]+\d+C\d+/i.test(code)) return 'adset'
   return 'campaign'
 }
+void classifyCode // suppress unused warning until integrated
 
 // Extrai os três níveis de código de uma utmCampaign
 function codesFromUtm(utmCampaign: string) {

@@ -99,7 +99,7 @@ export default function TestCard({ test, flags, activity, isOpen, onToggle }: Pr
             {/* Right side */}
             <div className="flex items-center gap-2 shrink-0">
               {stale && (
-                <AlertTriangle size={13} className="text-orange-400" title="Sem atividade recente" />
+                <AlertTriangle size={13} className="text-orange-400" aria-label="Sem atividade recente" />
               )}
               <span className="text-[10px] text-gray-400">{lastActLabel}</span>
               {isOpen ? (

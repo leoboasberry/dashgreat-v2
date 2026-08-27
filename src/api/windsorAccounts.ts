@@ -117,7 +117,7 @@ async function fetchForAccount(
   }
 
   const rows = parseResponse(await res.text())
-  return rows.map((r) => ({ ...(r as WindsorRowTagged), account }))
+  return rows.map((r) => ({ ...(r as unknown as WindsorRowTagged), account }))
 }
 
 /**
