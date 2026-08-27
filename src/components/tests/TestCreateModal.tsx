@@ -23,7 +23,7 @@ const METRICS = [
   { value: 'Volume de MQLs', label: 'Volume MQLs', desc: 'quantidade absoluta' },
 ]
 
-const OWNERS = ['Léo', 'Gui', 'Lucas', 'Gustavo', 'Kleber']
+const OWNERS = ['Guilherme', 'Leonardo', 'Endrio', 'Lucas', 'Kleber', 'Time de Pré-Vendas', 'Time de Closer', 'Time de Tech']
 
 const ACCOUNTS: Array<{ value: WindsorAccount; label: string; color: string; prefix: string }> = [
   { value: 'principal', label: 'Meta Principal',   color: 'bg-blue-500',   prefix: 'F' },
