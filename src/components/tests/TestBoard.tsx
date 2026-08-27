@@ -127,7 +127,7 @@ function KanbanCard({
 export default function TestBoard({ tests, flags, flagLinks, activityMap, onTestChange, onTestDelete }: Props) {
   const [accountFilter, setAccountFilter] = useState<AccountFilter>('todas')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todas')
-  const [view, setView] = useState<View>('lista')
+  const [view, setView] = useState<View>('kanban')
   const [selectedTestId, setSelectedTestId] = useState<string | null>(null)
 
   function handleToggle(id: string) {
