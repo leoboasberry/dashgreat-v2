@@ -6,6 +6,7 @@ import { parseAllLeads, filterLeads, parseCampaign } from '../../utils/parseLead
 import { computeMetrics, extractFilterOptions } from '../../utils/computeMetrics'
 import type { PageData } from '../../hooks/useDashboard'
 import { useCeaConfig } from '../../hooks/useCeaConfig'
+import { computeCEAStatus } from '../../utils/cea'
 import { useExcludedCampaigns } from '../../hooks/useExcludedCampaigns'
 import { useExcludedUtms } from '../../hooks/useExcludedUtms'
 import { useGoalsConfig } from '../../hooks/useGoalsConfig'
@@ -525,6 +526,45 @@ export default function ConversionsSection({ pages }: Props) {
     URL.revokeObjectURL(url)
   }
 
+  function downloadCampaignJson() {
+    const payload = {
+      periodo: { de: dateFrom, ate: dateTo },
+      exportadoEm: new Date().toISOString(),
+      regras_cea: ceaConfig,
+      campanhas: byCampaign.map((c) => {
+        const cea = computeCEAStatus(c, ceaConfig)
+        return {
+          campanha: c.campaign,
+          nome_completo: c.campaignFullName ?? null,
+          status: c.status ?? null,
+          investimento: c.spend,
+          mql: c.mqls,
+          sql: c.sqls,
+          oportunidade: c.opportunities,
+          reuniao_realizada: c.meetings,
+          ganho: c.won,
+          mrr: c.mrr,
+          cpmql: c.mqls > 0 && c.spend > 0 ? +(c.spend / c.mqls).toFixed(2) : null,
+          cea_badge: cea?.badge ?? null,
+          cea_tipo: cea?.type ?? null,
+          cea_valor: cea?.cea ?? null,
+          cea_cpa_mql: cea?.cpaMql ?? null,
+          cea_mql_sql_pct: cea?.mqlSqlPct ?? null,
+          cea_rr_ganho_pct: cea?.rrGanhoPct ?? null,
+        }
+      }),
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `campanhas_cea_${dateFrom}_${dateTo}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="flex flex-col gap-5">
       {/* Config warnings */}
@@ -805,7 +845,16 @@ export default function ConversionsSection({ pages }: Props) {
             )}
 
             {/* Drawer footer */}
-            <div className="px-5 py-4 border-t border-gray-100 shrink-0">
+            <div className="px-5 py-4 border-t border-gray-100 shrink-0 flex flex-col gap-2">
+              <button
+                onClick={downloadCampaignJson}
+                disabled={byCampaign.length === 0}
+                className="w-full flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 py-1.5 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Exportar métricas e CEA por campanha"
+              >
+                <Download size={12} />
+                Exportar campanhas + CEA
+              </button>
               <button
                 onClick={() => setFiltersOpen(false)}
                 className="w-full bg-[#0D2F9F] text-white text-sm font-medium py-2.5 rounded-xl hover:bg-[#0A2580] transition-colors"
