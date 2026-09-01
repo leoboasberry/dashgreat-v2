@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Loader2, RefreshCw, FileJson } from 'lucide-react'
+import { Plus, Loader2, RefreshCw, FileJson, Download } from 'lucide-react'
 import type { Test, TestFlag, TestFlagLink, TestActivity } from '../../api/tests'
 import { fetchTests, fetchFlags, fetchAllFlagLinks, fetchActivity } from '../../api/tests'
 import TestBoard from './TestBoard'
@@ -56,6 +56,27 @@ export default function TestsSection() {
     setActivityMap((prev) => { const next = { ...prev }; delete next[id]; return next })
   }
 
+  function handleExportJson() {
+    const payload = {
+      exported_at: new Date().toISOString(),
+      tests: tests.map((t) => ({
+        ...t,
+        flags: flagLinks
+          .filter((l) => l.test_id === t.id)
+          .map((l) => flags.find((f) => f.id === l.flag_id))
+          .filter(Boolean),
+        activity: activityMap[t.id] ?? [],
+      })),
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `testes-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="flex flex-col gap-5">
       {/* Section header */}
@@ -75,6 +96,15 @@ export default function TestsSection() {
             title="Atualizar"
           >
             <RefreshCw size={14} />
+          </button>
+          <button
+            onClick={handleExportJson}
+            disabled={loading || tests.length === 0}
+            className="flex items-center gap-1.5 text-sm border border-gray-200 text-gray-600 px-3 py-1.5 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Exportar todos os testes como JSON"
+          >
+            <Download size={14} />
+            Exportar JSON
           </button>
           <button
             onClick={() => setShowImportModal(true)}
