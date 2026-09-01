@@ -565,6 +565,60 @@ export default function ConversionsSection({ pages }: Props) {
     URL.revokeObjectURL(url)
   }
 
+  function downloadCampaignCsv() {
+    const SEP = ';'
+    const fmt = (n: number | null) =>
+      n === null ? '' : n.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
+    const fmtPct = (n: number | null) =>
+      n === null ? '' : n.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%'
+    const esc = (s: string | null) => {
+      if (!s) return ''
+      return s.includes(SEP) || s.includes('"') || s.includes('\n')
+        ? `"${s.replace(/"/g, '""')}"` : s
+    }
+
+    const headers = [
+      'Campanha', 'Nome Completo', 'Status',
+      'Investimento (R$)', 'MQL', 'SQL', 'Oportunidade', 'Reunião Realizada', 'Ganho', 'MRR (R$)',
+      'CPMQL (R$)', 'CEA Badge', 'CEA Tipo', 'CEA Valor', 'CPA/MQL (R$)', '% MQL→SQL', '% RR→Ganho',
+    ]
+
+    const rows = byCampaign.map((c) => {
+      const cea = computeCEAStatus(c, ceaConfig)
+      const cpmql = c.mqls > 0 && c.spend > 0 ? c.spend / c.mqls : null
+      return [
+        esc(c.campaign),
+        esc(c.campaignFullName ?? null),
+        esc(c.status ?? null),
+        fmt(c.spend),
+        String(c.mqls),
+        String(c.sqls),
+        String(c.opportunities),
+        String(c.meetings),
+        String(c.won),
+        fmt(c.mrr),
+        fmt(cpmql),
+        esc(cea?.badge ?? null),
+        esc(cea?.type ?? null),
+        fmt(cea?.cea ?? null),
+        fmt(cea?.cpaMql ?? null),
+        fmtPct(cea?.mqlSqlPct ?? null),
+        fmtPct(cea?.rrGanhoPct ?? null),
+      ].join(SEP)
+    })
+
+    const csv = '﻿' + [headers.join(SEP), ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `campanhas_cea_${dateFrom}_${dateTo}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="flex flex-col gap-5">
       {/* Config warnings */}
@@ -846,14 +900,24 @@ export default function ConversionsSection({ pages }: Props) {
 
             {/* Drawer footer */}
             <div className="px-5 py-4 border-t border-gray-100 shrink-0 flex flex-col gap-2">
-              <button
-                onClick={downloadCampaignJson}
-                className="w-full flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 py-2 rounded-xl hover:bg-gray-50 transition-colors"
-                title="Exportar métricas e CEA por campanha"
-              >
-                <Download size={12} />
-                Exportar campanhas + CEA
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={downloadCampaignCsv}
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 py-2 rounded-xl hover:bg-gray-50 transition-colors"
+                  title="Exportar campanhas + CEA em CSV (Excel)"
+                >
+                  <Download size={12} />
+                  CSV
+                </button>
+                <button
+                  onClick={downloadCampaignJson}
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 py-2 rounded-xl hover:bg-gray-50 transition-colors"
+                  title="Exportar campanhas + CEA em JSON"
+                >
+                  <Download size={12} />
+                  JSON
+                </button>
+              </div>
               <button
                 onClick={() => setFiltersOpen(false)}
                 className="w-full bg-[#0D2F9F] text-white text-sm font-medium py-2.5 rounded-xl hover:bg-[#0A2580] transition-colors"
