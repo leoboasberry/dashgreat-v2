@@ -848,8 +848,7 @@ export default function ConversionsSection({ pages }: Props) {
             <div className="px-5 py-4 border-t border-gray-100 shrink-0 flex flex-col gap-2">
               <button
                 onClick={downloadCampaignJson}
-                disabled={byCampaign.length === 0}
-                className="w-full flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 py-1.5 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 py-2 rounded-xl hover:bg-gray-50 transition-colors"
                 title="Exportar métricas e CEA por campanha"
               >
                 <Download size={12} />
