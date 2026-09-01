@@ -14,6 +14,7 @@ import {
 function getPrevPeriodDates(dateFrom: string, dateTo: string) {
   const from = new Date(dateFrom + 'T12:00:00')
   const to = new Date(dateTo + 'T12:00:00')
+  if (isNaN(from.getTime()) || isNaN(to.getTime()) || from >= to) return null
   const durationDays = Math.round((to.getTime() - from.getTime()) / 86_400_000)
   const prevTo = new Date(from.getTime() - 86_400_000)
   const prevFrom = new Date(prevTo.getTime() - durationDays * 86_400_000)
@@ -147,7 +148,9 @@ export default function QualityMetricsSection({
   // Fetch prev period in background
   useEffect(() => {
     setPrevMetrics(null)
-    const { prevFrom, prevTo } = getPrevPeriodDates(dateFrom, dateTo)
+    const prev = getPrevPeriodDates(dateFrom, dateTo)
+    if (!prev) return
+    const { prevFrom, prevTo } = prev
     let cancelled = false
     fetchWindsorData(prevFrom, prevTo)
       .then((rows) => {

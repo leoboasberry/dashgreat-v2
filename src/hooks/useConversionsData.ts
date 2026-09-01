@@ -28,6 +28,11 @@ export function useConversionsData(
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = useCallback(async (forceRefresh = false) => {
+    // Don't fetch if dates are invalid or inverted
+    if (!dateFrom || !dateTo || dateFrom > dateTo) {
+      setState({ loading: false, error: null, rawWindsorRows: [], rawEvents: [] })
+      return
+    }
     if (forceRefresh) {
       invalidateWindsorCache(dateFrom, dateTo)
       invalidateWindsorAccountCache(dateFrom, dateTo, 'lab')

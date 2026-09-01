@@ -21,7 +21,7 @@ import QualityMetricsSection from './QualityMetricsSection'
 import MultiSelect from './MultiSelect'
 import ExcludedCampaignsFilter from './ExcludedCampaignsFilter'
 import ExcludedUtmsFilter from './ExcludedUtmsFilter'
-import { currentMonthBRT, yesterdayBRT, getDatePresets } from '../../utils/dateBRT'
+import { currentMonthBRT, yesterdayBRT, todayBRT, getDatePresets } from '../../utils/dateBRT'
 
 // ── Filter persistence ────────────────────────────────────────────────────────
 
@@ -68,7 +68,12 @@ export default function ConversionsSection({ pages }: Props) {
   const saved = useRef(loadSaved())
 
   const [dateFrom, setDateFrom] = useState(() => saved.current.dateFrom ?? currentMonthBRT().from)
-  const [dateTo, setDateTo] = useState(() => saved.current.dateTo ?? yesterdayBRT())
+  const [dateTo, setDateTo] = useState(() => {
+    const from = saved.current.dateFrom ?? currentMonthBRT().from
+    const to = saved.current.dateTo ?? yesterdayBRT()
+    // Avoid inverted range (e.g. on the 1st day of a new month)
+    return to >= from ? to : todayBRT()
+  })
 
   // Existing channel filter (buttons)
   const [activeChannels, setActiveChannels] = useState<string[]>(() => saved.current.activeChannels ?? [])
