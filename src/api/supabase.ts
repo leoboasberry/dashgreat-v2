@@ -5,6 +5,9 @@ const CACHE_TTL_MINUTES = 20
 // In-memory session cache
 const memCache = new Map<string, SupabaseEvent[]>()
 
+// Separate in-memory cache for lead-centric queries
+const leadCentricMemCache = new Map<string, SupabaseEvent[]>()
+
 export interface SupabaseEvent {
   event_id?: string
   event_type: string
@@ -131,6 +134,86 @@ export async function fetchEvents(dateFrom: string, dateTo: string): Promise<Sup
 export function invalidateSupabaseCache(dateFrom: string, dateTo: string) {
   const key = `supabase_events_v6_${dateFrom}_${dateTo}`
   memCache.delete(key)
+  import('./cache').then(({ clearCacheByKey }) => clearCacheByKey(key))
+}
+
+// ── Lead-centric queries ──
+// Fetches ALL events for leads (deal_ids) whose MQL event falls within [dateFrom, dateTo].
+// Windsor spend is still fetched for the same period by the hook — so spend and lead cohort
+// share the same calendar window, giving a correct ROI attribution.
+
+export async function fetchLeadCentricEvents(dateFrom: string, dateTo: string): Promise<SupabaseEvent[]> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !anonKey) return []
+
+  const cacheKey = `supabase_lead_centric_v1_${dateFrom}_${dateTo}`
+
+  if (leadCentricMemCache.has(cacheKey)) return leadCentricMemCache.get(cacheKey)!
+
+  const stored = getCacheEntry<SupabaseEvent[]>(cacheKey)
+  if (stored) {
+    leadCentricMemCache.set(cacheKey, stored)
+    return stored
+  }
+
+  const tsFrom = `${dateFrom}T03:00:00Z`
+  const tsTo   = `${addDayISO(dateTo)}T02:59:59Z`
+
+  const headers: Record<string, string> = {
+    apikey: anonKey,
+    Authorization: `Bearer ${anonKey}`,
+  }
+  const base = `${supabaseUrl}/rest/v1/events`
+
+  // Step 1: Identify lead cohort — MQL events in the date window
+  const [mqlByDate, mqlByTs] = await Promise.all([
+    fetchAllPages(base, `select=deal_id&event_type=eq.mql&event_date=gte.${dateFrom}&event_date=lte.${dateTo}&order=event_id.asc`, headers),
+    fetchAllPages(base, `select=deal_id&event_type=eq.mql&event_date=is.null&event_ts=gte.${tsFrom}&event_ts=lte.${tsTo}&order=event_id.asc`, headers),
+  ])
+
+  const dealIds = [...new Set(
+    [...mqlByDate, ...mqlByTs]
+      .map((e) => e.deal_id)
+      .filter((id): id is string => !!id),
+  )]
+
+  if (dealIds.length === 0) return []
+
+  // Step 2: Fetch ALL events for those deal_ids (batched to respect URL limits)
+  const BATCH = 80
+  const batchResults = await Promise.all(
+    Array.from({ length: Math.ceil(dealIds.length / BATCH) }, (_, i) => {
+      const slice = dealIds.slice(i * BATCH, (i + 1) * BATCH)
+      return fetchAllPages(
+        base,
+        `select=${SELECT}&deal_id=in.(${slice.join(',')})&order=event_id.asc`,
+        headers,
+      ).catch(() => [] as SupabaseEvent[])
+    }),
+  )
+
+  const seen = new Set<string>()
+  const events: SupabaseEvent[] = []
+  for (const batch of batchResults) {
+    for (const ev of batch) {
+      const id = ev.event_id
+      if (id) {
+        if (seen.has(id)) continue
+        seen.add(id)
+      }
+      events.push(ev)
+    }
+  }
+
+  setCacheEntry(cacheKey, events, CACHE_TTL_MINUTES)
+  leadCentricMemCache.set(cacheKey, events)
+  return events
+}
+
+export function invalidateLeadCentricCache(dateFrom: string, dateTo: string) {
+  const key = `supabase_lead_centric_v1_${dateFrom}_${dateTo}`
+  leadCentricMemCache.delete(key)
   import('./cache').then(({ clearCacheByKey }) => clearCacheByKey(key))
 }
 

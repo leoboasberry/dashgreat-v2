@@ -9,6 +9,7 @@ import PageRow from './components/PageRow'
 import SummaryChart from './components/SummaryChart'
 import CampaignsSection from './components/campaigns/CampaignsSection'
 import ConversionsSection from './components/conversions/ConversionsSection'
+import LeadCentricSection from './components/conversions/LeadCentricSection'
 import LeadsSection from './components/leads/LeadsSection'
 import BackfillSection from './components/backfill/BackfillSection'
 import AudiencesSection from './components/audiences/AudiencesSection'
@@ -34,7 +35,7 @@ const ENV_CONFIG: Config | null =
 // Password stored as plain text env var (VITE_GP_PASSWORD) or as SHA-256 hash in localStorage
 const ENV_PASSWORD: string = (import.meta.env.VITE_GP_PASSWORD as string) ?? ''
 
-type Tab = 'overview' | 'campaigns' | 'conversions' | 'leads' | 'backfill' | 'audiences' | 'capi' | 'tests'
+type Tab = 'overview' | 'campaigns' | 'conversions' | 'cohort' | 'leads' | 'backfill' | 'audiences' | 'capi' | 'tests'
 
 function loadConfig(): Config | null {
   try {
@@ -179,6 +180,9 @@ export default function App() {
           <TabButton active={activeTab === 'conversions'} onClick={() => setActiveTab('conversions')}>
             Conversões
           </TabButton>
+          <TabButton active={activeTab === 'cohort'} onClick={() => setActiveTab('cohort')}>
+            Coorte de Leads
+          </TabButton>
           <TabButton active={activeTab === 'tests'} onClick={() => setActiveTab('tests')}>
             Testes
           </TabButton>
@@ -230,6 +234,9 @@ export default function App() {
 
         {/* ── Conversões — always available, even if GreatPages is down ── */}
         {activeTab === 'conversions' && <ConversionsSection pages={pages} />}
+
+        {/* ── Coorte de Leads — atribuição por data de criação do lead ── */}
+        {activeTab === 'cohort' && <LeadCentricSection pages={pages} />}
 
         {/* ── Backfill CRM — always available ── */}
         {activeTab === 'backfill' && <BackfillSection pages={pages} />}
